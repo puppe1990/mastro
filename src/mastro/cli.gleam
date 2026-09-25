@@ -7,6 +7,7 @@ import gleam/io
 import gleam/string
 import mastro/cli/assets
 import mastro/cli/build
+import mastro/cli/db
 import mastro/cli/dev
 import mastro/cli/gen
 import mastro/cli/migrate_cmd
@@ -25,6 +26,7 @@ pub fn main() {
     ["gen", "live", name, ..] -> gen.live(name)
     ["routes", ..] -> routes.run()
     ["migrate", ..] -> migrate_cmd.run()
+    ["db", ..args] -> db.run(args)
     ["build", ..] -> build.run()
     ["assets", "setup", ..] -> assets.setup()
     ["assets", "build", ..] -> assets.build()
@@ -66,6 +68,8 @@ fn print_help() {
       "",
       "  routes                            Print the route table",
       "  migrate                           Run pending migrations",
+      "  db <status|rollback|prune-sessions|seed>",
+      "                                    Database commands",
       "  seed                              Run database seeds",
       "  build                             Compile Lustre islands to JS",
       "  assets setup                      Set up Tailwind CSS",

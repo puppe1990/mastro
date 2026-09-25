@@ -197,6 +197,23 @@ Requires a database (`--db postgres` or `--db sqlite`).
 
 ---
 
+### `mastro db`
+
+Database commands, answered by the generated module.
+
+```bash
+mastro db status            # list applied and pending migrations
+mastro db rollback          # revert the most recent migration
+mastro db prune-sessions    # delete expired sessions
+mastro db seed              # run the project seeds
+mastro db seed --list       # list the public helpers in the seed module
+```
+
+`status`, `rollback` and `prune-sessions` need a database; `seed` reuses
+the seed module, creating it on first run.
+
+---
+
 ### `mastro build`
 
 Compile Lustre islands to JavaScript.
