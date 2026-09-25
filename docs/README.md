@@ -15,6 +15,7 @@
 - [Database](database.md) — Postgres and SQLite setup, repos, migrations
 - [Authentication](authentication.md) — generated auth system, sessions, middleware
 - [CSRF Protection](csrf.md) — double-submit tokens in forms, headers and Drive
+- [Security Headers](security.md) — response hardening, the production gate, client address
 - [Testing](testing.md) — test helpers, writing handler tests
 - [Deployment](deployment.md) — building for production, environment config
 
