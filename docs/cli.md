@@ -232,6 +232,25 @@ dead worker left behind.
 
 ---
 
+### `mastro pwa [--bump] [--force]`
+
+Install the PWA assets: `amarra.js`, `manifest.webmanifest`, `sw.js`, the
+placeholder icons and `og.png`.
+
+```bash
+mastro pwa
+mastro pwa --bump
+mastro pwa --force
+```
+
+- `--bump` increments `CACHE_VERSION` in `sw.js`.
+- `--force` resets the brand and the cache version.
+- Without `--force`, existing files are preserved.
+
+See [PWA & mobile](pwa.md) for the manifest contract and `/health`.
+
+---
+
 ### `mastro build`
 
 Compile Lustre islands to JavaScript.

@@ -14,6 +14,7 @@ import mastro/cli/gen
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
+import mastro/cli/pwa
 import mastro/cli/routes
 import mastro/cli/seed
 
@@ -31,6 +32,7 @@ pub fn main() {
     ["db", ..args] -> db.run(args)
     ["jobs", ..args] -> jobs_cmd.run(args)
     ["build", ..] -> build.run()
+    ["pwa", ..args] -> pwa.run(args)
     ["assets", "setup", ..] -> assets.setup()
     ["assets", "build", ..] -> assets.build()
     ["assets", ..] -> assets.setup()
@@ -78,6 +80,7 @@ fn print_help() {
       "                                    Run and inspect the job queue",
       "  seed                              Run database seeds",
       "  build                             Compile Lustre islands to JS",
+      "  pwa [--bump] [--force]            Install PWA assets (manifest, sw.js, icons)",
       "  assets setup                      Set up Tailwind CSS",
       "  assets build                      Build CSS/JS assets",
       "  dev                               Start the dev server",
