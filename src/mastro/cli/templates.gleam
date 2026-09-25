@@ -129,14 +129,19 @@ pub fn main() {
 "
 }
 
-pub fn config_module(_name: String) -> String {
+pub fn config_module(name: String) -> String {
   "import envoy
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, from_result}
 import gleam/result
 import gleam/string
+import mastro/i18n
+import mastro/meta
 import mastro/security
+
+/// The package name, known at generation time.
+pub const app_name = \"" <> name <> "\"
 
 pub type Config {
   Config(
@@ -145,6 +150,7 @@ pub type Config {
     secret_key_base: String,
     env: Env,
     log_format: LogFormat,
+    locale: i18n.Locale,
     app_url: Option(String),
     admin_token: Option(String),
     trusted_proxies: List(String),
@@ -188,12 +194,15 @@ pub fn load() -> Config {
     Error(_) -> default_log_format(env)
   }
 
+  let locale = i18n.parse(envoy.get(\"LOCALE\") |> result.unwrap(\"en\"))
+
   Config(
     port: port,
     port_string: int.to_string(port),
     secret_key_base: secret_key_base,
     env: env,
     log_format: log_format,
+    locale: locale,
     app_url: from_result(envoy.get(\"APP_URL\")),
     admin_token: from_result(envoy.get(\"ADMIN_TOKEN\")),
     trusted_proxies: split_list(envoy.get(\"TRUSTED_PROXIES\")),
@@ -217,6 +226,16 @@ pub fn is_development(cfg: Config) -> Bool {
 
 pub fn log_json(cfg: Config) -> Bool {
   cfg.log_format == Json
+}
+
+/// The site metadata a page renders: app name plus the configured URL.
+pub fn site(cfg: Config) -> meta.Site {
+  meta.site_from(app_name, cfg.app_url)
+}
+
+/// Translate a UI string with the configured locale.
+pub fn t(cfg: Config, key: String) -> String {
+  i18n.t(cfg.locale, key)
 }
 
 /// The boot gate. `admin_routes` is `True` once the app serves bearer
@@ -314,16 +333,21 @@ pub fn home_handler(name: String) -> String {
   "import lustre/attribute.{class}
 import lustre/element.{text}
 import lustre/element/html.{h1, p, section}
+import " <> name <> "/config
 import " <> name <> "/context.{type Context}
 import " <> name <> "/web/layouts/root_layout
 import wisp.{type Request, type Response}
 
-pub fn index(req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, ctx: Context) -> Response {
   section([class(\"hero\")], [
-    h1([], [text(\"Welcome to " <> name <> "\")]),
+    h1([], [text(config.t(ctx.config, \"app.welcome\") <> \" \" <> config.app_name)]),
     p([], [text(\"Built with Mastro — a convention-first web framework for Gleam.\")]),
   ])
-  |> root_layout.wrap(\"Home\", req)
+  |> root_layout.wrap_site(
+    config.t(ctx.config, \"app.home\"),
+    req,
+    config.site(ctx.config),
+  )
   |> wisp.html_response(200)
 }
 "
@@ -355,17 +379,32 @@ pub fn internal_error(_req: Request) -> Response {
 "
 }
 
-pub fn root_layout() -> String {
+pub fn root_layout(name: String) -> String {
   "import lustre/attribute.{charset, class, content, href, id, name, rel, src}
 import lustre/element.{type Element}
 import lustre/element/html.{body, div, head, html, link, main, meta, nav, script, title}
 import mastro/csrf
+import mastro/meta
 import wisp.{type Request}
 
-/// Render a page: `content |> root_layout.wrap(\"Title\", req)`. Drive morphs
-/// `#amarra-main`, so the id is part of the contract; `amarra.js` loads at
-/// the end of the body to wire the kit hooks and Drive navigation.
+/// Render a page deriving the site URL from the request. Prefer
+/// `wrap_site` with `config.site(ctx.config)` so `APP_URL` is used.
 pub fn wrap(inner: Element(Nil), page_title: String, req: Request) -> String {
+  wrap_site(
+    inner,
+    page_title,
+    req,
+    meta.site(\"" <> name <> "\") |> meta.for_request(req),
+  )
+}
+
+/// Render a page with explicit site metadata (OG/Twitter tags).
+pub fn wrap_site(
+  inner: Element(Nil),
+  page_title: String,
+  req: Request,
+  site: meta.Site,
+) -> String {
   html([], [
     head([], [
       meta([charset(\"utf-8\")]),
@@ -373,6 +412,7 @@ pub fn wrap(inner: Element(Nil), page_title: String, req: Request) -> String {
       csrf.meta_tag(csrf.token(req)),
       title([], page_title),
       link([rel(\"stylesheet\"), href(\"/static/css/app.css\")]),
+      ..meta.head_elements(site),
     ]),
     body([], [
       nav([id(\"amarra-nav\")], []),

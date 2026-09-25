@@ -74,7 +74,7 @@ pub fn run(path: String, flags: List(String)) {
     ),
     #(
       path <> "/src/" <> name <> "/web/layouts/root_layout.gleam",
-      templates.root_layout(),
+      templates.root_layout(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/components/flash.gleam",

@@ -179,6 +179,36 @@ pub fn new_app_serves_health_with_lan_urls_test() {
   })
 }
 
+pub fn new_app_has_i18n_and_meta_test() {
+  in_temp_dir("meta", fn(dir) {
+    let project_dir = dir <> "/meta_app"
+    new.run(project_dir, [])
+
+    file_contains(
+      project_dir <> "/src/meta_app/config.gleam",
+      "locale: i18n.Locale",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/config.gleam",
+      "pub const app_name",
+    )
+    |> should.be_true
+    file_contains(project_dir <> "/src/meta_app/config.gleam", "meta.site_from")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/web/layouts/root_layout.gleam",
+      "meta.head_elements",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/web/home_handler.gleam",
+      "config.site",
+    )
+    |> should.be_true
+  })
+}
+
 pub fn pwa_installs_assets_and_bump_increments_test() {
   in_temp_dir("pwa", fn(dir) {
     let project_dir = dir <> "/pwa_app"
