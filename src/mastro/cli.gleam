@@ -10,6 +10,7 @@ import mastro/cli/build
 import mastro/cli/db
 import mastro/cli/dev
 import mastro/cli/gen
+import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
 import mastro/cli/routes
@@ -27,6 +28,7 @@ pub fn main() {
     ["routes", ..] -> routes.run()
     ["migrate", ..] -> migrate_cmd.run()
     ["db", ..args] -> db.run(args)
+    ["jobs", ..args] -> jobs_cmd.run(args)
     ["build", ..] -> build.run()
     ["assets", "setup", ..] -> assets.setup()
     ["assets", "build", ..] -> assets.build()
@@ -70,6 +72,8 @@ fn print_help() {
       "  migrate                           Run pending migrations",
       "  db <status|rollback|prune-sessions|seed>",
       "                                    Database commands",
+      "  jobs <work|status|retry|discard|prune>",
+      "                                    Run and inspect the job queue",
       "  seed                              Run database seeds",
       "  build                             Compile Lustre islands to JS",
       "  assets setup                      Set up Tailwind CSS",

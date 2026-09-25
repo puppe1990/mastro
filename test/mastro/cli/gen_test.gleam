@@ -7,6 +7,7 @@ import gleam/list
 import gleam/string
 import gleeunit/should
 import mastro/cli/gen
+import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
 import mastro/cli/types
@@ -332,6 +333,32 @@ pub fn db_module_answers_every_subcommand_test() {
     file_contains(path, "\"prune-sessions\"") |> should.be_true
     file_contains(path, "migrate.run(") |> should.be_true
     file_contains(path, "migrate.rollback(") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn jobs_module_answers_every_subcommand_test() {
+  in_temp_dir("jobs_module", fn(dir) {
+    let project_dir = dir <> "/jobs_app"
+    new.run(project_dir, ["--db", "postgres"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    jobs_cmd.ensure_module("jobs_app", types.Postgres)
+
+    let path = "src/jobs_app/jobs.gleam"
+    file_exists(path) |> should.be_true
+    file_contains(path, "\"work\"") |> should.be_true
+    file_contains(path, "\"status\"") |> should.be_true
+    file_contains(path, "\"retry\"") |> should.be_true
+    file_contains(path, "\"discard\"") |> should.be_true
+    file_contains(path, "\"prune\"") |> should.be_true
+    file_contains(path, "--queues") |> should.be_true
+    file_contains(path, "jobs.Store(") |> should.be_true
+    file_contains(path, "with_queues(") |> should.be_true
 
     let assert Ok(_) = set_cwd(cwd)
     Nil
