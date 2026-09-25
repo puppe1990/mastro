@@ -11,6 +11,11 @@ record.
 | `PORT` | `4000` | HTTP server port |
 | `SECRET_KEY_BASE` | dev fallback | Secret for signing cookies (64+ chars) |
 | `APP_ENV` | `dev` | Environment: `dev`, `test`, or `prod` |
+| `LOG_FORMAT` | `json` in dev, `text` otherwise | Request/SQL line format |
+
+`LOG_FORMAT=text` prints the classic `200 GET /posts (4ms)` lines; anything
+else (or `json`) prints one JSON object per line. See
+[Dev logs](dev-logs.md) for the `/logs` viewer and the boot banner.
 
 ## Config module
 
