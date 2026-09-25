@@ -234,7 +234,8 @@ pub fn migration(name: String) {
   let filename = number <> "_" <> name <> ".sql"
   let path = dir <> "/" <> filename
 
-  let content = "-- Migration: " <> name <> "\n-- Created: " <> number <> "\n\n"
+  let content =
+    "-- Migration: " <> name <> "\n" <> "-- up\n" <> "\n" <> "-- down\n" <> "\n"
 
   let assert Ok(_) = simplifile.write(path, content)
 
@@ -1583,19 +1584,25 @@ fn resource_migration(
   let table = singularize(name) <> "s"
 
   case db {
-    Sqlite -> "CREATE TABLE " <> table <> " (
+    Sqlite -> "-- up
+CREATE TABLE " <> table <> " (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
 " <> column_defs <> ",
   inserted_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- down
+DROP TABLE " <> table <> ";
 "
-    _ -> "CREATE TABLE " <> table <> " (
+    _ -> "-- up
+CREATE TABLE " <> table <> " (
   id SERIAL PRIMARY KEY,
 " <> column_defs <> ",
   inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- down
+DROP TABLE " <> table <> ";
 "
   }
 }
@@ -1995,7 +2002,8 @@ pub fn create(
 }
 
 fn auth_migration() -> String {
-  "CREATE TABLE users (
+  "-- up
+CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   hashed_password TEXT NOT NULL,
@@ -2004,6 +2012,8 @@ fn auth_migration() -> String {
 );
 
 CREATE UNIQUE INDEX users_email_index ON users (email);
+-- down
+DROP TABLE users;
 "
 }
 
