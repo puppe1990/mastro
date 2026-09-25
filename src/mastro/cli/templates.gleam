@@ -83,13 +83,19 @@ import mist
 import " <> name <> "/config
 import " <> name <> "/context
 import " <> name <> "/router
+import mastro/security
 import wisp
 import wisp/wisp_mist" <> db_import <> "
 
 pub fn main() {
   wisp.configure_logger()
 
-  let cfg = config.load()" <> db_ctx <> "
+  let cfg = config.load()
+
+  case config.validate(cfg) {
+    Ok(_) -> Nil
+    Error(errors) -> panic as security.describe(errors)
+  }" <> db_ctx <> "
 
   let assert Ok(_) =
     wisp_mist.handler(router.handle_request(_, ctx), cfg.secret_key_base)
@@ -106,7 +112,11 @@ pub fn main() {
 pub fn config_module(_name: String) -> String {
   "import envoy
 import gleam/int
+import gleam/list
+import gleam/option.{type Option, from_result}
 import gleam/result
+import gleam/string
+import mastro/security
 
 pub type Config {
   Config(
@@ -114,6 +124,9 @@ pub type Config {
     port_string: String,
     secret_key_base: String,
     env: Env,
+    app_url: Option(String),
+    admin_token: Option(String),
+    trusted_proxies: List(String),
   )
 }
 
@@ -146,7 +159,36 @@ pub fn load() -> Config {
     port_string: int.to_string(port),
     secret_key_base: secret_key_base,
     env: env,
+    app_url: from_result(envoy.get(\"APP_URL\")),
+    admin_token: from_result(envoy.get(\"ADMIN_TOKEN\")),
+    trusted_proxies: split_list(envoy.get(\"TRUSTED_PROXIES\")),
   )
+}
+
+pub fn is_production(cfg: Config) -> Bool {
+  cfg.env == Prod
+}
+
+/// The boot gate. `admin_routes` is `True` once the app serves bearer
+/// admin routes, which makes `ADMIN_TOKEN` mandatory in production.
+pub fn validate(cfg: Config) -> Result(Nil, List(security.Error)) {
+  security.validate(
+    production: is_production(cfg),
+    app_url: cfg.app_url,
+    admin_token: cfg.admin_token,
+    admin_routes: False,
+  )
+}
+
+fn split_list(value: Result(String, Nil)) -> List(String) {
+  case value {
+    Ok(value) ->
+      value
+      |> string.split(\",\")
+      |> list.map(string.trim)
+      |> list.filter(fn(item) { item != \"\" })
+    Error(_) -> []
+  }
 }
 "
 }
@@ -173,15 +215,17 @@ pub type Context {
 
 pub fn router_module(name: String, _db: DbChoice) -> String {
   "import gleam/http
+import " <> name <> "/config
 import " <> name <> "/context.{type Context}
 import " <> name <> "/web/error_handler
 import " <> name <> "/web/home_handler
 import mastro/csrf
 import mastro/dev_error
+import mastro/security
 import wisp.{type Request, type Response}
 
 pub fn handle_request(req: Request, ctx: Context) -> Response {
-  use req <- middleware(req)
+  use req <- middleware(ctx, req)
 
   case wisp.path_segments(req), req.method {
     [], http.Get -> home_handler.index(req, ctx)
@@ -190,12 +234,14 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 }
 
 fn middleware(
+  ctx: Context,
   req: Request,
   next: fn(Request) -> Response,
 ) -> Response {
   let req = wisp.method_override(req)
   use <- wisp.log_request(req)
   use <- dev_error.rescue(req)
+  use <- security.headers(security.defaults(config.is_production(ctx.config)))
   use <- wisp.serve_static(req, under: \"/static\", from: priv_static())
   use threaded_req <- csrf.issue(req)
   next(threaded_req)
