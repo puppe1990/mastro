@@ -176,6 +176,7 @@ pub fn router_module(name: String, _db: DbChoice) -> String {
 import " <> name <> "/context.{type Context}
 import " <> name <> "/web/error_handler
 import " <> name <> "/web/home_handler
+import mastro/csrf
 import mastro/dev_error
 import wisp.{type Request, type Response}
 
@@ -196,7 +197,8 @@ fn middleware(
   use <- wisp.log_request(req)
   use <- dev_error.rescue(req)
   use <- wisp.serve_static(req, under: \"/static\", from: priv_static())
-  next(req)
+  use threaded_req <- csrf.issue(req)
+  next(threaded_req)
 }
 
 fn priv_static() -> String {
@@ -214,12 +216,12 @@ import " <> name <> "/context.{type Context}
 import " <> name <> "/web/layouts/root_layout
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, _ctx: Context) -> Response {
   section([class(\"hero\")], [
     h1([], [text(\"Welcome to " <> name <> "\")]),
     p([], [text(\"Built with Mastro — a convention-first web framework for Gleam.\")]),
   ])
-  |> root_layout.wrap(\"Home\")
+  |> root_layout.wrap(\"Home\", req)
   |> wisp.html_response(200)
 }
 "
@@ -255,12 +257,18 @@ pub fn root_layout() -> String {
   "import lustre/attribute.{charset, class, content, href, name, rel}
 import lustre/element.{type Element}
 import lustre/element/html.{body, head, html, link, main, meta, title}
+import mastro/csrf
+import wisp.{type Request}
 
-pub fn wrap(inner: Element(Nil), page_title: String) -> String {
+/// Render a page: `content |> root_layout.wrap(\"Title\", req)`. The request
+/// carries the CSRF token the middleware threaded, so amarra.js can echo it
+/// in the `X-CSRF-Token` header.
+pub fn wrap(inner: Element(Nil), page_title: String, req: Request) -> String {
   html([], [
     head([], [
       meta([charset(\"utf-8\")]),
       meta([name(\"viewport\"), content(\"width=device-width, initial-scale=1\")]),
+      csrf.meta_tag(csrf.token(req)),
       title([], page_title),
       link([rel(\"stylesheet\"), href(\"/static/css/app.css\")]),
     ]),
@@ -535,19 +543,21 @@ pub fn resource_handler(
     _ -> "ctx.db"
   }
   "import gleam/int
+import gleam/option
 import " <> app_name <> "/context.{type Context}
 import " <> app_name <> "/data/" <> resource_singular <> "_repo
 import " <> app_name <> "/web/error_handler
 import " <> app_name <> "/web/forms/" <> resource_singular <> "_form
 import " <> app_name <> "/web/layouts/root_layout
 import " <> app_name <> "/web/" <> resource_singular <> "_views
+import mastro/csrf
 import mastro/flash
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, ctx: Context) -> Response {
+pub fn index(req: Request, ctx: Context) -> Response {
   let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ")
   " <> resource_singular <> "_views.index_view(items)
-  |> root_layout.wrap(\"" <> type_name <> "s\")
+  |> root_layout.wrap(\"" <> type_name <> "s\", req)
   |> wisp.html_response(200)
 }
 
@@ -559,28 +569,34 @@ pub fn show(req: Request, ctx: Context, id: String) -> Response {
         Error(_) -> error_handler.not_found(req)
         Ok(item) ->
           " <> resource_singular <> "_views.show_view(item)
-          |> root_layout.wrap(\"" <> type_name <> "\")
+          |> root_layout.wrap(\"" <> type_name <> "\", req)
           |> wisp.html_response(200)
       }
   }
 }
 
-pub fn new(_req: Request, _ctx: Context) -> Response {
-  " <> resource_singular <> "_views.form_view(" <> resource_singular <> "_form.empty(), [])
-  |> root_layout.wrap(\"New " <> type_name <> "\")
+pub fn new(req: Request, _ctx: Context) -> Response {
+  " <> resource_singular <> "_views.form_view(
+    " <> resource_singular <> "_form.empty(),
+    [],
+    csrf.token(req),
+  )
+  |> root_layout.wrap(\"New " <> type_name <> "\", req)
   |> wisp.html_response(200)
 }
 
 pub fn create(req: Request, ctx: Context) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case " <> resource_singular <> "_form.decode(form_data) {
     Error(errors) ->
       " <> resource_singular <> "_views.form_view(
         " <> resource_singular <> "_form.from_form_data(form_data),
         errors,
+        csrf.token(req),
       )
-      |> root_layout.wrap(\"New " <> type_name <> "\")
+      |> root_layout.wrap(\"New " <> type_name <> "\", req)
       |> wisp.html_response(422)
 
     Ok(params) ->
@@ -601,8 +617,12 @@ pub fn edit(req: Request, ctx: Context, id: String) -> Response {
       case " <> resource_singular <> "_repo.get(" <> db_arg <> ", id) {
         Error(_) -> error_handler.not_found(req)
         Ok(item) ->
-          " <> resource_singular <> "_views.form_view(" <> resource_singular <> "_form.from_" <> resource_singular <> "(item), [])
-          |> root_layout.wrap(\"Edit " <> type_name <> "\")
+          " <> resource_singular <> "_views.form_view(
+            " <> resource_singular <> "_form.from_" <> resource_singular <> "(item),
+            [],
+            csrf.token(req),
+          )
+          |> root_layout.wrap(\"Edit " <> type_name <> "\", req)
           |> wisp.html_response(200)
       }
   }
@@ -610,6 +630,7 @@ pub fn edit(req: Request, ctx: Context, id: String) -> Response {
 
 pub fn update(req: Request, ctx: Context, id: String) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case int.parse(id) {
     Error(_) -> error_handler.not_found(req)
@@ -619,8 +640,9 @@ pub fn update(req: Request, ctx: Context, id: String) -> Response {
           " <> resource_singular <> "_views.form_view(
             " <> resource_singular <> "_form.from_form_data(form_data),
             errors,
+            csrf.token(req),
           )
-          |> root_layout.wrap(\"Edit " <> type_name <> "\")
+          |> root_layout.wrap(\"Edit " <> type_name <> "\", req)
           |> wisp.html_response(422)
 
         Ok(params) ->
@@ -636,6 +658,8 @@ pub fn update(req: Request, ctx: Context, id: String) -> Response {
 }
 
 pub fn delete(req: Request, ctx: Context, id: String) -> Response {
+  use <- csrf.require_request(req)
+
   case int.parse(id) {
     Error(_) -> error_handler.not_found(req)
     Ok(id) -> {
