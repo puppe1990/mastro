@@ -8,6 +8,8 @@ import gleam/list
 import gleam/result
 import gleam/string
 import gleeunit/should
+import mastro/cli/component
+import mastro/cli/destroy
 import mastro/cli/gen
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
@@ -228,6 +230,78 @@ pub fn pwa_installs_assets_and_bump_increments_test() {
 
     pwa.run(["--bump"])
     file_contains("priv/static/js/sw.js", "CACHE_VERSION = 2") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+// =============================================================================
+// destroy and gen component
+// =============================================================================
+
+pub fn gen_component_seeds_an_override_test() {
+  in_temp_dir("component", fn(dir) {
+    let project_dir = dir <> "/comp_app"
+    new.run(project_dir, [])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    component.run("locale-toggle", [])
+
+    file_exists("src/comp_app/web/components/locale_toggle.gleam")
+    |> should.be_true
+    file_contains(
+      "src/comp_app/web/components/locale_toggle.gleam",
+      "pub fn render(",
+    )
+    |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn destroy_resource_removes_files_and_routes_test() {
+  in_temp_dir("destroy", fn(dir) {
+    let project_dir = dir <> "/dest_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+    file_exists("src/dest_app/web/post_handler.gleam") |> should.be_true
+
+    destroy.run("resource", "posts", [])
+
+    file_exists("src/dest_app/web/post_handler.gleam") |> should.be_false
+    file_exists("src/dest_app/data/post_repo.gleam") |> should.be_false
+    file_contains("src/dest_app/router.gleam", "post_handler")
+    |> should.be_false
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn destroy_dry_run_writes_nothing_test() {
+  in_temp_dir("destroy_dry", fn(dir) {
+    let project_dir = dir <> "/dry_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+    let assert Ok(before) = simplifile.read("src/dry_app/router.gleam")
+
+    destroy.run("resource", "posts", ["--dry-run"])
+
+    file_exists("src/dry_app/web/post_handler.gleam") |> should.be_true
+    let assert Ok(after) = simplifile.read("src/dry_app/router.gleam")
+    after |> should.equal(before)
 
     let assert Ok(_) = set_cwd(cwd)
     Nil

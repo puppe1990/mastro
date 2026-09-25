@@ -7,16 +7,21 @@ import gleam/io
 import gleam/string
 import mastro/cli/assets
 import mastro/cli/build
+import mastro/cli/component
+import mastro/cli/console
 import mastro/cli/db
+import mastro/cli/destroy
 import mastro/cli/dev
 import mastro/cli/doctor
 import mastro/cli/gen
 import mastro/cli/jobs_cmd
+import mastro/cli/link
 import mastro/cli/migrate_cmd
 import mastro/cli/new
 import mastro/cli/pwa
 import mastro/cli/routes
 import mastro/cli/seed
+import mastro/cli/upgrade
 
 pub fn main() {
   case argv.load().arguments {
@@ -27,7 +32,11 @@ pub fn main() {
     ["gen", "auth", ..] -> gen.auth()
     ["gen", "island", name, ..] -> gen.island(name)
     ["gen", "live", name, ..] -> gen.live(name)
-    ["routes", ..] -> routes.run()
+    ["gen", "component", "--list", ..] -> component.run("", ["--list"])
+    ["gen", "component", stem, ..flags] -> component.run(stem, flags)
+    ["destroy", "auth", ..flags] -> destroy.run("auth", "", flags)
+    ["destroy", kind, name, ..flags] -> destroy.run(kind, name, flags)
+    ["routes", ..args] -> routes.run(args)
     ["migrate", ..] -> migrate_cmd.run()
     ["db", ..args] -> db.run(args)
     ["jobs", ..args] -> jobs_cmd.run(args)
@@ -39,6 +48,9 @@ pub fn main() {
     ["seed", ..] -> seed.run()
     ["dev", ..] -> dev.run()
     ["doctor", ..args] -> doctor.run(args)
+    ["link", ..args] -> link.run(args)
+    ["upgrade", ..args] -> upgrade.run(args)
+    ["console", ..] -> console.run([])
     ["help", ..] | ["--help", ..] | ["-h", ..] -> print_help()
     ["version", ..] | ["--version", ..] | ["-v", ..] ->
       io.println("mastro 0.2.0")
@@ -71,8 +83,11 @@ fn print_help() {
       "  gen auth                          Generate starter authentication",
       "  gen island <name>                 Generate a Lustre interactive island",
       "  gen live <name>                   Generate a Lustre server component",
+      "  gen component <stem>              Seed a kit component override (--list, --dry-run)",
+      "  destroy <kind> <name>             Remove generated files (--dry-run)",
+      "    kinds: resource, handler, model, migration, auth",
       "",
-      "  routes                            Print the route table",
+      "  routes [--verbose]                Print the route table",
       "  migrate                           Run pending migrations",
       "  db <status|rollback|prune-sessions|seed>",
       "                                    Database commands",
@@ -85,6 +100,9 @@ fn print_help() {
       "  assets build                      Build CSS/JS assets",
       "  dev                               Start the dev server",
       "  doctor [--mobile]                 Check the app against the Amarra contract",
+      "  console                           Open the app REPL",
+      "  link [path] [--unlink]            Point gleam.toml at a local framework",
+      "  upgrade [version] [--dry-run]     Bump the framework and run doctor",
       "",
       "  help                              Show this help",
       "  version                           Show version",
