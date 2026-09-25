@@ -54,7 +54,10 @@ async function fetchDrive(url, headers = {}) {
   const response = await fetch(url, {
     headers: { ...headers, [DRIVE_HEADER]: "true" },
   });
-  return response.ok ? response.text() : null;
+  if (!response.ok) return null;
+  const type = response.headers.get("content-type") || "";
+  const text = await response.text();
+  return { text, stream: type.includes("text/vnd.amarra-stream") };
 }
 
 export function applyDriveHTML(html, doc = document) {
@@ -67,6 +70,68 @@ export function applyDriveHTML(html, doc = document) {
       current.innerHTML = next.innerHTML;
       changed = true;
     }
+  }
+  if (changed && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("amarra:morphed"));
+  }
+  return changed;
+}
+
+// -- Stream -------------------------------------------------------------------
+
+export function parseOps(body) {
+  return body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function applyOp(op, doc) {
+  const target = op.target ? doc.getElementById(op.target) : null;
+  switch (op.kind) {
+    case "append":
+      if (!target) return false;
+      target.insertAdjacentHTML("beforeend", op.html);
+      return true;
+    case "prepend":
+      if (!target) return false;
+      target.insertAdjacentHTML("afterbegin", op.html);
+      return true;
+    case "replace":
+      if (!target) return false;
+      target.outerHTML = op.html;
+      return true;
+    case "morph":
+      if (!target) return false;
+      target.innerHTML = op.html;
+      return true;
+    case "remove":
+      if (!target) return false;
+      target.remove();
+      return true;
+    case "toast": {
+      const host = doc.getElementById("amarra-toast-host");
+      if (!host) return false;
+      host.insertAdjacentHTML("beforeend", op.html);
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+export function applyStream(body, doc = document) {
+  let changed = false;
+  for (const op of parseOps(body)) {
+    changed = applyOp(op, doc) || changed;
   }
   if (changed && typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("amarra:morphed"));
@@ -306,8 +371,10 @@ export function start(doc = document) {
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey) return;
     if (!shouldIntercept(anchor, window.location.origin)) return;
     event.preventDefault();
-    const html = await fetchDrive(anchor.href);
-    if (html) applyDriveHTML(html, doc);
+    const result = await fetchDrive(anchor.href);
+    if (!result) return;
+    if (result.stream) applyStream(result.text, doc);
+    else applyDriveHTML(result.text, doc);
   });
 
   initHooks(doc);
