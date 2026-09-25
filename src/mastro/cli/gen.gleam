@@ -1196,6 +1196,7 @@ fn resource_repo_sqlite(
         <> "_form.{type "
         <> type_name
         <> "Params}",
+      "import " <> app_name <> "/data/repo",
       "import sqlight",
       "",
       "fn "
@@ -1213,8 +1214,7 @@ fn resource_repo_sqlite(
       "}",
       "",
       "pub fn list(db_path: String) -> List(" <> type_name <> ") {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  case sqlight.query("
+      "  case repo.query(db_path, "
         <> q
         <> "SELECT "
         <> select_fields
@@ -1222,7 +1222,7 @@ fn resource_repo_sqlite(
         <> table
         <> " ORDER BY id DESC"
         <> q
-        <> ", on: conn, with: [], expecting: "
+        <> ", [], "
         <> resource_singular
         <> "_decoder()) {",
       "    Ok(rows) -> rows",
@@ -1233,8 +1233,7 @@ fn resource_repo_sqlite(
       "pub fn get(db_path: String, id: Int) -> Result("
         <> type_name
         <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query("
+      "  repo.query(db_path, "
         <> q
         <> "SELECT "
         <> select_fields
@@ -1242,7 +1241,7 @@ fn resource_repo_sqlite(
         <> table
         <> " WHERE id = ?"
         <> q
-        <> ", on: conn, with: [sqlight.int(id)], expecting: "
+        <> ", [sqlight.int(id)], "
         <> resource_singular
         <> "_decoder())",
       "  |> result.replace_error(Nil)",
@@ -1259,8 +1258,8 @@ fn resource_repo_sqlite(
         <> "Params) -> Result("
         <> type_name
         <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query(",
+      "  repo.query(",
+      "    db_path,",
       "    "
         <> q
         <> "INSERT INTO "
@@ -1273,11 +1272,10 @@ fn resource_repo_sqlite(
         <> select_fields
         <> q
         <> ",",
-      "    on: conn,",
-      "    with: [",
+      "    [",
       insert_params,
       "    ],",
-      "    expecting: " <> resource_singular <> "_decoder(),",
+      "    " <> resource_singular <> "_decoder(),",
       "  )",
       "  |> result.replace_error(Nil)",
       "  |> result.try(fn(rows) {",
@@ -1293,8 +1291,8 @@ fn resource_repo_sqlite(
       "  id: Int,",
       "  params: " <> type_name <> "Params,",
       ") -> Result(" <> type_name <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query(",
+      "  repo.query(",
+      "    db_path,",
       "    "
         <> q
         <> "UPDATE "
@@ -1305,12 +1303,11 @@ fn resource_repo_sqlite(
         <> select_fields
         <> q
         <> ",",
-      "    on: conn,",
-      "    with: [",
+      "    [",
       insert_params,
       "      sqlight.int(id),",
       "    ],",
-      "    expecting: " <> resource_singular <> "_decoder(),",
+      "    " <> resource_singular <> "_decoder(),",
       "  )",
       "  |> result.replace_error(Nil)",
       "  |> result.try(fn(rows) {",
@@ -1322,14 +1319,13 @@ fn resource_repo_sqlite(
       "}",
       "",
       "pub fn delete(db_path: String, id: Int) -> Result(Nil, Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query("
+      "  repo.query(db_path, "
         <> q
         <> "DELETE FROM "
         <> table
         <> " WHERE id = ?"
         <> q
-        <> ", on: conn, with: [sqlight.int(id)], expecting: decode.success(Nil))",
+        <> ", [sqlight.int(id)], decode.success(Nil))",
       "  |> result.replace(Nil)",
       "  |> result.replace_error(Nil)",
       "}",

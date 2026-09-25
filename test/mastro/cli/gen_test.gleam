@@ -104,6 +104,44 @@ pub fn new_extracts_name_from_path_test() {
   })
 }
 
+pub fn new_app_wires_dev_logs_and_the_banner_test() {
+  in_temp_dir("new_logs", fn(dir) {
+    let project_dir = dir <> "/logs_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    file_contains(project_dir <> "/src/logs_app.gleam", "dev_log.install(logs)")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app.gleam",
+      "net.pick_port(cfg.port",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app.gleam",
+      "net.banner(\"logs_app\"",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/context.gleam",
+      "logs: dev_log.Store",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/config.gleam",
+      "log_format: LogFormat",
+    )
+    |> should.be_true
+
+    file_contains(project_dir <> "/src/logs_app/router.gleam", "dev_log.viewer")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/router.gleam",
+      "dev_log.request_log",
+    )
+    |> should.be_true
+  })
+}
+
 // =============================================================================
 // gen resource (runs inside a generated project)
 // =============================================================================
@@ -310,6 +348,30 @@ pub fn resource_migration_carries_its_own_rollback_test() {
     let path = "src/roll_app/data/migrations/001_create_posts.sql"
     file_contains(path, "-- up") |> should.be_true
     file_contains(path, "DROP TABLE posts;") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn sqlite_resource_repo_routes_through_the_logging_helper_test() {
+  in_temp_dir("sqlite_repo_log", fn(dir) {
+    let project_dir = dir <> "/sql_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+
+    file_contains("src/sql_app/data/repo.gleam", "pub fn query(")
+    |> should.be_true
+    file_contains("src/sql_app/data/repo.gleam", "dev_log.sql(")
+    |> should.be_true
+    file_contains("src/sql_app/data/post_repo.gleam", "repo.query(")
+    |> should.be_true
+    file_contains("src/sql_app/data/post_repo.gleam", "sqlight.with_connection")
+    |> should.be_false
 
     let assert Ok(_) = set_cwd(cwd)
     Nil

@@ -65,17 +65,20 @@ gleam test   # Run tests
 
 pub fn main_module(name: String, db: DbChoice) -> String {
   let db_import = case db {
-    Postgres -> "\nimport " <> name <> "/data/repo"
-    Sqlite -> "\nimport " <> name <> "/data/repo"
+    Postgres | Sqlite -> "\nimport " <> name <> "/data/repo"
     NoDb -> ""
   }
 
-  let db_ctx = case db {
-    Postgres ->
-      "\n  let assert Ok(db) = repo.connect(cfg)\n  let ctx = context.Context(config: cfg, db: db)"
-    Sqlite ->
-      "\n  let db_path = repo.database_path(cfg)\n  let ctx = context.Context(config: cfg, db_path: db_path)"
-    NoDb -> "\n  let ctx = context.Context(config: cfg)"
+  let db_open = case db {
+    Postgres -> "\n  let assert Ok(db) = repo.connect(cfg)"
+    Sqlite -> "\n  let db_path = repo.database_path(cfg)"
+    NoDb -> ""
+  }
+
+  let ctx_args = case db {
+    Postgres -> "config: cfg, db: db, logs: logs"
+    Sqlite -> "config: cfg, db_path: db_path, logs: logs"
+    NoDb -> "config: cfg, logs: logs"
   }
 
   "import gleam/erlang/process
@@ -84,6 +87,8 @@ import mist
 import " <> name <> "/config
 import " <> name <> "/context
 import " <> name <> "/router
+import mastro/dev_log
+import mastro/net
 import mastro/security
 import wisp
 import wisp/wisp_mist" <> db_import <> "
@@ -96,15 +101,26 @@ pub fn main() {
   case config.validate(cfg) {
     Ok(_) -> Nil
     Error(errors) -> panic as security.describe(errors)
-  }" <> db_ctx <> "
+  }
+
+  let logs =
+    dev_log.start(
+      200,
+      dev_log.options(config.log_json(cfg), config.is_development(cfg)),
+    )
+  dev_log.install(logs)
+
+  // A busy preferred port should not stop the dev server; take the next free.
+  let port = net.pick_port(cfg.port, 10)" <> db_open <> "
+  let ctx = context.Context(" <> ctx_args <> ")
 
   let assert Ok(_) =
     wisp_mist.handler(router.handle_request(_, ctx), cfg.secret_key_base)
     |> mist.new
-    |> mist.port(cfg.port)
+    |> mist.port(port)
     |> mist.start
 
-  io.println(\"Listening on http://localhost:\" <> cfg.port_string)
+  io.println(net.banner(\"" <> name <> "\", port))
   process.sleep_forever()
 }
 "
@@ -125,6 +141,7 @@ pub type Config {
     port_string: String,
     secret_key_base: String,
     env: Env,
+    log_format: LogFormat,
     app_url: Option(String),
     admin_token: Option(String),
     trusted_proxies: List(String),
@@ -135,6 +152,12 @@ pub type Env {
   Dev
   Test
   Prod
+}
+
+/// Request/SQL logs are JSON in development unless `LOG_FORMAT=text`.
+pub type LogFormat {
+  Text
+  Json
 }
 
 pub fn load() -> Config {
@@ -155,19 +178,42 @@ pub fn load() -> Config {
     _ -> Dev
   }
 
+  let log_format = case envoy.get(\"LOG_FORMAT\") {
+    Ok(\"text\") -> Text
+    Ok(\"json\") -> Json
+    Ok(_) -> default_log_format(env)
+    Error(_) -> default_log_format(env)
+  }
+
   Config(
     port: port,
     port_string: int.to_string(port),
     secret_key_base: secret_key_base,
     env: env,
+    log_format: log_format,
     app_url: from_result(envoy.get(\"APP_URL\")),
     admin_token: from_result(envoy.get(\"ADMIN_TOKEN\")),
     trusted_proxies: split_list(envoy.get(\"TRUSTED_PROXIES\")),
   )
 }
 
+fn default_log_format(env: Env) -> LogFormat {
+  case env {
+    Dev -> Json
+    _ -> Text
+  }
+}
+
 pub fn is_production(cfg: Config) -> Bool {
   cfg.env == Prod
+}
+
+pub fn is_development(cfg: Config) -> Bool {
+  cfg.env == Dev
+}
+
+pub fn log_json(cfg: Config) -> Bool {
+  cfg.log_format == Json
 }
 
 /// The boot gate. `admin_routes` is `True` once the app serves bearer
@@ -207,9 +253,10 @@ pub fn context_module(name: String, db: DbChoice) -> String {
   }
 
   "import " <> name <> "/config" <> db_import <> "
+import mastro/dev_log
 
 pub type Context {
-  Context(config: config.Config" <> db_field <> ")
+  Context(config: config.Config" <> db_field <> ", logs: dev_log.Store)
 }
 "
 }
@@ -222,6 +269,7 @@ import " <> name <> "/web/error_handler
 import " <> name <> "/web/home_handler
 import mastro/csrf
 import mastro/dev_error
+import mastro/dev_log
 import mastro/security
 import wisp.{type Request, type Response}
 
@@ -230,6 +278,8 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req), req.method {
     [], http.Get -> home_handler.index(req, ctx)
+    [\"logs\"], http.Get ->
+      dev_log.viewer(ctx.logs, config.is_development(ctx.config), req)
     _, _ -> error_handler.not_found(req)
   }
 }
@@ -240,7 +290,7 @@ fn middleware(
   next: fn(Request) -> Response,
 ) -> Response {
   let req = wisp.method_override(req)
-  use <- wisp.log_request(req)
+  use <- dev_log.request_log(ctx.logs, req)
   use <- dev_error.rescue(req)
   use <- security.headers(security.defaults(config.is_production(ctx.config)))
   use <- wisp.serve_static(req, under: \"/static\", from: priv_static())
@@ -365,7 +415,11 @@ pub fn connect(cfg: Config) -> Result(pog.Connection, Nil) {
   }
 }
 "
-    Sqlite -> "import " <> name <> "/config.{type Config}
+    Sqlite -> "import gleam/dynamic/decode
+import gleam/list
+import " <> name <> "/config.{type Config}
+import mastro/dev_log
+import sqlight
 
 /// Get the SQLite database path for the current environment.
 pub fn database_path(cfg: Config) -> String {
@@ -373,6 +427,21 @@ pub fn database_path(cfg: Config) -> String {
     config.Test -> \":memory:\"
     _ -> \"" <> name <> ".db\"
   }
+}
+
+/// Run a query on a fresh connection, recording it in the dev log so the
+/// console (and the `/logs` viewer) shows the SQL the app ran.
+pub fn query(
+  db_path: String,
+  sql: String,
+  params: List(sqlight.Value),
+  expecting: decode.Decoder(a),
+) -> Result(List(a), sqlight.Error) {
+  use conn <- sqlight.with_connection(db_path)
+  let start = dev_log.now_ms()
+  let result = sqlight.query(sql, on: conn, with: params, expecting: expecting)
+  dev_log.sql(sql, list.length(params), dev_log.now_ms() - start)
+  result
 }
 "
     NoDb -> ""
