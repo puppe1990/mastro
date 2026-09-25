@@ -267,13 +267,14 @@ fn service_worker_network_first_check(files: Dict(String, String)) -> Check {
 }
 
 fn chat_check(files: Dict(String, String)) -> Check {
-  case any_content(files, fn(_) { True }, "chat-messages") {
-    True -> Check("chat", Pass, "the chat container #chat-messages exists")
+  case any_content(files, fn(_) { True }, "chat-history") {
+    True ->
+      Check("chat", Pass, "the chat Stream container #chat-history exists")
     False ->
       Check(
         "chat",
         Warn,
-        "chat container #chat-messages not found — run `mastro gen stream chat` if the app has chat",
+        "chat Stream container #chat-history not found — render `mastro/chat.history()` if the app has chat",
       )
   }
 }

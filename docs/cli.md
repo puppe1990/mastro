@@ -373,8 +373,8 @@ service worker, the jobs dashboard and the icon/og placeholders.
 
 `--mobile` adds the on-device checks: flash inside `#amarra-main`, no
 `fonts.googleapis.com` in the source (blocked by the default CSP),
-`amarra.js` served network-first in `sw.js`, the `#chat-messages`
-container, and `GET /health` returning `lan_urls`.
+`amarra.js` served network-first in `sw.js`, the `#chat-history`
+Stream container, and `GET /health` returning `lan_urls`.
 
 ```
 mastro doctor
