@@ -138,6 +138,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 | `mastro gen migration <name>` | SQL migration file |
 | `mastro migrate` | Run pending migrations |
 | `mastro build` | Compile Lustre islands to JavaScript |
+| `mastro pwa [--bump] [--force]` | Install PWA assets (manifest, sw.js, icons) |
 | `mastro dev` | Dev server with file watching (auto-rebuild) |
 | `mastro doctor [--mobile]` | Check the app against the Amarra contract |
 | `mastro routes` | Print the route table |
@@ -171,6 +172,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] Dev error page (dark theme, error details, stack trace, request info)
 - [x] Dev logs (`/logs`, JSON request/SQL lines, boot banner with LAN URLs)
 - [x] `mastro doctor [--mobile]` checks (layout, amarra.js, PWA, CSP, chat, health)
+- [x] PWA assets (`mastro pwa`), manifest, service worker and `GET /health` with LAN URLs
 - [x] Dev file watcher (auto-rebuild on `src/` changes via fswatch)
 - [x] Auto-format all generated code
 - [x] Route table printer

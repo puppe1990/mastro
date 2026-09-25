@@ -17,6 +17,7 @@
 - [Sessions](sessions.md) — persistent sessions, rotation, pruning
 - [Jobs](jobs.md) — the persistent queue, workers, retries and the dashboard
 - [Dev logs](dev-logs.md) — request/SQL logging, the `/logs` viewer, the boot banner
+- [PWA & mobile](pwa.md) — `mastro pwa`, manifest, service worker, `/health`
 - [CSRF Protection](csrf.md) — double-submit tokens in forms, headers and Drive
 - [Security Headers](security.md) — response hardening, the production gate, client address
 - [Testing](testing.md) — test helpers, writing handler tests
