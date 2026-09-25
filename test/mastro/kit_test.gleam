@@ -65,6 +65,19 @@ pub fn form_test() {
   should.be_true(string.contains(out, "INNER"))
 }
 
+pub fn form_injects_the_csrf_field_test() {
+  let assert Ok(form) = view.component(reg(), "form")
+  let out = render(form, [#("action", "/items"), #("csrf_token", "tok-123")])
+  should.be_true(string.contains(out, "name=\"csrf_token\""))
+  should.be_true(string.contains(out, "value=\"tok-123\""))
+}
+
+pub fn form_without_a_token_adds_no_field_test() {
+  let assert Ok(form) = view.component(reg(), "form")
+  let out = render(form, [#("action", "/items")])
+  should.be_false(string.contains(out, "csrf_token"))
+}
+
 pub fn password_hook_test() {
   let assert Ok(password) = view.component(reg(), "password")
   let out = render(password, [#("name", "password")])

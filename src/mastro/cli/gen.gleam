@@ -28,11 +28,11 @@ import lustre/element.{text}
 import lustre/element/html.{h1, section}
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, _ctx: Context) -> Response {
   section([class(\"" <> name <> "\")], [
     h1([], [text(\"" <> capitalize(name) <> "\")]),
   ])
-  |> root_layout.wrap(\"" <> capitalize(name) <> "\")
+  |> root_layout.wrap(\"" <> capitalize(name) <> "\", req)
   |> wisp.html_response(200)
 }
 "
@@ -500,7 +500,7 @@ import lustre/element/html.{div, section}
 import lustre/server_component
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, _ctx: Context) -> Response {
   section([], [
     // Inline the Lustre server component client runtime
     server_component.script(),
@@ -513,7 +513,7 @@ pub fn index(_req: Request, _ctx: Context) -> Response {
       [text(\"Loading " <> type_name <> "...\")],
     ),
   ])
-  |> root_layout.wrap(\"" <> type_name <> "\")
+  |> root_layout.wrap(\"" <> type_name <> "\", req)
   |> wisp.html_response(200)
 }
 "
@@ -830,6 +830,7 @@ import lustre/element/html.{
 }
 import " <> app_name <> "/domain/" <> resource_singular <> ".{type " <> type_name <> "}
 import " <> app_name <> "/web/forms/" <> resource_singular <> "_form
+import mastro/csrf
 
 pub fn index_view(items: List(" <> type_name <> ")) -> Element(Nil) {
   section([class(\"" <> resource_plural <> "\")], [
@@ -868,6 +869,7 @@ pub fn show_view(item: " <> type_name <> ") -> Element(Nil) {
 pub fn form_view(
   values: " <> resource_singular <> "_form." <> type_name <> "Form,
   errors: List(#(String, String)),
+  csrf_token: String,
 ) -> Element(Nil) {
   let post_action = case values.id {
     option.Some(id) -> \"/" <> resource_plural <> "/\" <> int.to_string(id)
@@ -880,6 +882,7 @@ pub fn form_view(
       option.None -> \"New " <> type_name <> "\"
     })]),
     form([attribute.action(post_action), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       case values.id {
         option.Some(_) -> input([type_(\"hidden\"), name(\"_method\"), value(\"put\")])
         option.None -> text(\"\")
@@ -2081,6 +2084,7 @@ fn get_value(data: wisp.FormData, key: String) -> String {
 
 fn auth_handler(app: String) -> String {
   "import gleam/int
+import gleam/option
 import " <> app <> "/context.{type Context}
 import " <> app <> "/data/user_repo
 import " <> app <> "/domain/auth
@@ -2088,36 +2092,46 @@ import " <> app <> "/web/auth_views
 import " <> app <> "/web/error_handler
 import " <> app <> "/web/forms/auth_form
 import " <> app <> "/web/layouts/root_layout
+import mastro/csrf
 import mastro/flash
 import wisp.{type Request, type Response}
 
-pub fn login_page(_req: Request, _ctx: Context) -> Response {
-  auth_views.login_view(\"\", [])
-  |> root_layout.wrap(\"Log In\")
+pub fn login_page(req: Request, _ctx: Context) -> Response {
+  auth_views.login_view(\"\", [], csrf.token(req))
+  |> root_layout.wrap(\"Log In\", req)
   |> wisp.html_response(200)
 }
 
 pub fn login(req: Request, ctx: Context) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case auth_form.decode_login(form_data) {
     Error(errors) ->
-      auth_views.login_view(\"\", errors)
-      |> root_layout.wrap(\"Log In\")
+      auth_views.login_view(\"\", errors, csrf.token(req))
+      |> root_layout.wrap(\"Log In\", req)
       |> wisp.html_response(422)
 
     Ok(params) ->
       case user_repo.get_by_email(ctx.db, params.email) {
         Error(_) ->
-          auth_views.login_view(params.email, [#(\"email\", \"Invalid email or password\")])
-          |> root_layout.wrap(\"Log In\")
+          auth_views.login_view(
+            params.email,
+            [#(\"email\", \"Invalid email or password\")],
+            csrf.token(req),
+          )
+          |> root_layout.wrap(\"Log In\", req)
           |> wisp.html_response(422)
 
         Ok(user) ->
           case auth.verify_password(params.password, user.hashed_password) {
             False ->
-              auth_views.login_view(params.email, [#(\"email\", \"Invalid email or password\")])
-              |> root_layout.wrap(\"Log In\")
+              auth_views.login_view(
+                params.email,
+                [#(\"email\", \"Invalid email or password\")],
+                csrf.token(req),
+              )
+              |> root_layout.wrap(\"Log In\", req)
               |> wisp.html_response(422)
 
             True ->
@@ -2135,19 +2149,20 @@ pub fn login(req: Request, ctx: Context) -> Response {
   }
 }
 
-pub fn register_page(_req: Request, _ctx: Context) -> Response {
-  auth_views.register_view(\"\", [])
-  |> root_layout.wrap(\"Register\")
+pub fn register_page(req: Request, _ctx: Context) -> Response {
+  auth_views.register_view(\"\", [], csrf.token(req))
+  |> root_layout.wrap(\"Register\", req)
   |> wisp.html_response(200)
 }
 
 pub fn register(req: Request, ctx: Context) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case auth_form.decode_register(form_data) {
     Error(errors) ->
-      auth_views.register_view(\"\", errors)
-      |> root_layout.wrap(\"Register\")
+      auth_views.register_view(\"\", errors, csrf.token(req))
+      |> root_layout.wrap(\"Register\", req)
       |> wisp.html_response(422)
 
     Ok(params) -> {
@@ -2165,8 +2180,12 @@ pub fn register(req: Request, ctx: Context) -> Response {
           |> flash.set_flash(req, \"info\", \"Account created\")
 
         Error(_) ->
-          auth_views.register_view(params.email, [#(\"email\", \"Could not create account\")])
-          |> root_layout.wrap(\"Register\")
+          auth_views.register_view(
+            params.email,
+            [#(\"email\", \"Could not create account\")],
+            csrf.token(req),
+          )
+          |> root_layout.wrap(\"Register\", req)
           |> wisp.html_response(422)
       }
     }
@@ -2188,11 +2207,17 @@ import lustre/element.{type Element, text}
 import lustre/element/html.{
   a, button, div, form, h1, input, label, p, section,
 }
+import mastro/csrf
 
-pub fn login_view(email: String, errors: List(#(String, String))) -> Element(Nil) {
+pub fn login_view(
+  email: String,
+  errors: List(#(String, String)),
+  csrf_token: String,
+) -> Element(Nil) {
   section([class(\"auth-form\")], [
     h1([], [text(\"Log In\")]),
     form([attribute.action(\"/login\"), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       div([class(\"field\")], [
         label([], [text(\"Email\")]),
         input([type_(\"email\"), name(\"email\"), value(email)]),
@@ -2215,10 +2240,12 @@ pub fn login_view(email: String, errors: List(#(String, String))) -> Element(Nil
 pub fn register_view(
   email: String,
   errors: List(#(String, String)),
+  csrf_token: String,
 ) -> Element(Nil) {
   section([class(\"auth-form\")], [
     h1([], [text(\"Register\")]),
     form([attribute.action(\"/register\"), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       div([class(\"field\")], [
         label([], [text(\"Email\")]),
         input([type_(\"email\"), name(\"email\"), value(email)]),

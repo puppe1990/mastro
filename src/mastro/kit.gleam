@@ -13,6 +13,7 @@ import gleam/list
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/html
+import mastro/csrf
 import mastro/view.{type Component}
 
 pub type Column {
@@ -56,6 +57,8 @@ pub fn defaults() -> Dict(String, Component) {
 
 // -- Uniform components -------------------------------------------------------
 
+/// A `csrf_token` attribute adds the hidden field the double-submit check
+/// reads; pass it once, never alongside a hand-written field.
 fn form(attrs: List(#(String, String)), inner: Element(Nil)) -> Element(Nil) {
   html.form(
     [
@@ -63,8 +66,15 @@ fn form(attrs: List(#(String, String)), inner: Element(Nil)) -> Element(Nil) {
       attribute.action(attr_or(attrs, "action", "")),
       attribute.class(attr_or(attrs, "class", "form")),
     ],
-    [inner],
+    [csrf_field(attr_or(attrs, "csrf_token", "")), inner],
   )
+}
+
+fn csrf_field(token: String) -> Element(Nil) {
+  case token {
+    "" -> element.text("")
+    _ -> csrf.hidden_field(token)
+  }
 }
 
 fn input(attrs: List(#(String, String)), _inner: Element(Nil)) -> Element(Nil) {

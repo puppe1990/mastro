@@ -14,6 +14,7 @@
 - [Forms & Validation](forms.md) — form decoding, validation helpers, error display
 - [Database](database.md) — Postgres and SQLite setup, repos, migrations
 - [Authentication](authentication.md) — generated auth system, sessions, middleware
+- [CSRF Protection](csrf.md) — double-submit tokens in forms, headers and Drive
 - [Testing](testing.md) — test helpers, writing handler tests
 - [Deployment](deployment.md) — building for production, environment config
 
