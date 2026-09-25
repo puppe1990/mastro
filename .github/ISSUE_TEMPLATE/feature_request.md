@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a feature for Refrakt
+about: Suggest a feature for Mastro
 title: ''
 labels: enhancement
 ---

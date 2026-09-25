@@ -1,6 +1,6 @@
 # Routing
 
-Refrakt uses Gleam pattern matching for routing. All routes live in
+Mastro uses Gleam pattern matching for routing. All routes live in
 one file: `src/<app>/router.gleam`.
 
 ## How it works
@@ -52,7 +52,7 @@ pub fn show(req: Request, ctx: Context, id: String) -> Response {
 
 ## RESTful resource routes
 
-`refrakt gen resource posts ...` adds these routes:
+`mastro gen resource posts ...` adds these routes:
 
 ```gleam
 ["posts"], http.Get -> post_handler.index(req, ctx)
@@ -69,7 +69,7 @@ Note: `["posts", "new"]` comes before `["posts", id]` so the literal
 
 ## Method override
 
-HTML forms only support GET and POST. To send PUT and DELETE, Refrakt
+HTML forms only support GET and POST. To send PUT and DELETE, Mastro
 uses method override — a hidden form field `_method`:
 
 ```html
@@ -130,7 +130,7 @@ fn middleware(req: Request, next: fn(Request) -> Response) -> Response {
 ## Viewing all routes
 
 ```bash
-refrakt routes
+mastro routes
 ```
 
 Output:

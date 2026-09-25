@@ -11,7 +11,7 @@ Wisp 2.2, Lustre 5.6, Mist 5, Pog 4.1, Sqlight 1.0, gleam_http 4.3.
 
 ## Framework name
 
-**Refrakt**
+**Mastro**
 
 Light enters, structure emerges. German spelling of "refract" — what a
 prism does. Free on Hex, distinctive, no ecosystem collisions.
@@ -20,16 +20,16 @@ prism does. Free on Hex, distinctive, no ecosystem collisions.
 
 ## Commands
 
-The CLI is `refrakt`. It wraps `gleam` — it does not replace it.
+The CLI is `mastro`. It wraps `gleam` — it does not replace it.
 `gleam build`, `gleam test`, `gleam run` still work.
-Refrakt adds the conventions on top.
+Mastro adds the conventions on top.
 
-### `refrakt new <name>`
+### `mastro new <name>`
 
 Create a new project.
 
 ```
-$ refrakt new my_app
+$ mastro new my_app
 Creating my_app...
 
   my_app/
@@ -71,12 +71,12 @@ Flags:
 - `--no-db` — default, no database wiring
 - `--no-css` — skip default stylesheet
 
-### `refrakt gen page <name>`
+### `mastro gen page <name>`
 
 Generate a handler + route + view for a static page.
 
 ```
-$ refrakt gen page about
+$ mastro gen page about
 
 Created:
   src/my_app/web/about_handler.gleam
@@ -86,12 +86,12 @@ Updated:
   src/my_app/router.gleam       ← added GET /about route
 ```
 
-### `refrakt gen resource <name> <field:type ...>`
+### `mastro gen resource <name> <field:type ...>`
 
 Generate a full CRUD resource. This is the big one.
 
 ```
-$ refrakt gen resource posts title:string body:text published:bool
+$ mastro gen resource posts title:string body:text published:bool
 
 Created:
   src/my_app/web/post_handler.gleam       ← index, show, new, create, edit, update, delete
@@ -109,13 +109,13 @@ Updated:
 Field types: `string`, `text`, `int`, `float`, `bool`, `date`, `datetime`,
 `optional(string)`, `optional(int)`, etc.
 
-### `refrakt gen auth`
+### `mastro gen auth`
 
 Generate a starter authentication system. Not a library — actual code in
 your project that you own and can modify.
 
 ```
-$ refrakt gen auth
+$ mastro gen auth
 
 Created:
   src/my_app/web/auth_handler.gleam       ← register, login, logout
@@ -132,35 +132,35 @@ Updated:
   src/my_app/router.gleam
 ```
 
-### `refrakt gen live <name>`
+### `mastro gen live <name>`
 
 Generate a Lustre server component with WebSocket wiring.
 Phase 2+ only. Not in MVP.
 
-### `refrakt gen migration <name>`
+### `mastro gen migration <name>`
 
 Generate a timestamped SQL migration file.
 
 ```
-$ refrakt gen migration add_email_to_users
+$ mastro gen migration add_email_to_users
 
 Created:
   src/my_app/data/migrations/002_add_email_to_users.sql
 ```
 
-### `refrakt migrate`
+### `mastro migrate`
 
 Run pending migrations.
 
 ```
-$ refrakt migrate
+$ mastro migrate
 Running migrations...
   001_create_posts.sql ✓
   002_add_email_to_users.sql ✓
 Done. 2 migrations applied.
 ```
 
-### `refrakt dev`
+### `mastro dev`
 
 Start the dev server. Wraps `gleam run` with:
 - colored request logging
@@ -169,12 +169,12 @@ Start the dev server. Wraps `gleam run` with:
 
 Phase 3 adds file watching + rebuild.
 
-### `refrakt routes`
+### `mastro routes`
 
 Print the route table.
 
 ```
-$ refrakt routes
+$ mastro routes
 GET     /                   home_handler.index
 GET     /about              about_handler.index
 GET     /posts              post_handler.index
@@ -304,7 +304,7 @@ fn priv_static() -> String {
 }
 ```
 
-After `refrakt gen resource posts title:string body:text published:bool`,
+After `mastro gen resource posts title:string body:text published:bool`,
 the router becomes:
 
 ```gleam
@@ -943,7 +943,7 @@ my_app/
 
 ## What the framework actually provides (as a library)
 
-The `refrakt` package itself is small. It provides:
+The `mastro` package itself is small. It provides:
 
 1. **Validation helpers** — `required`, `min_length`, `max_length`, `format`,
    `inclusion`, `numericality`. Composable, return `List(#(String, String))`.
@@ -952,7 +952,7 @@ The `refrakt` package itself is small. It provides:
    `get_flash(req, key)`. Built on signed cookies.
 
 3. **Router helpers** — `resource_routes(name)` returns the list of
-   path/method pairs for `refrakt routes` to print.
+   path/method pairs for `mastro routes` to print.
 
 4. **Migration runner** — reads `*.sql` files from the migrations directory,
    tracks applied migrations in a `_migrations` table, runs pending ones
@@ -971,7 +971,7 @@ Everything else is generated into the user's project as plain Gleam code.
 
 ## What the CLI provides (as a separate tool)
 
-The `refrakt` CLI is a code generator. It:
+The `mastro` CLI is a code generator. It:
 
 1. Reads `gleam.toml` to find the project name.
 2. Uses string templates to generate `.gleam` and `.sql` files.

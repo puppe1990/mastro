@@ -1,6 +1,6 @@
 # Project Structure
 
-Every Refrakt project follows the same directory layout. There are no
+Every Mastro project follows the same directory layout. There are no
 configuration options for project structure — this is a convention, and
 the generators depend on it.
 

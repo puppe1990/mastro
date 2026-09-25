@@ -1,7 +1,7 @@
 <div align="center">
 
 <h1 align="center">
-  Refrakt
+  Mastro
 </h1>
 
 <p align="center">
@@ -13,13 +13,13 @@
   <a href="https://gleam.run/">
     <img alt="Gleam" src="https://img.shields.io/badge/Gleam-1.14+-ffaff3?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJMMiA3bDEwIDUgMTAtNS0xMC01ek0yIDE3bDEwIDUgMTAtNS0xMC01LTEwIDV6TTIgMTJsMTAgNSAxMC01LTEwLTUtMTAgNXoiLz48L3N2Zz4=&style=for-the-badge" />
   </a>
-  <a href="https://hex.pm/packages/refrakt">
+  <a href="https://hex.pm/packages/mastro">
     <img alt="Hex" src="https://img.shields.io/badge/Hex-v0.2.0-8b5cf6?style=for-the-badge" />
   </a>
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge" />
   </a>
-  <a href="https://github.com/raskell-io/refrakt/actions">
+  <a href="https://github.com/puppe1990/mastro/actions">
     <img alt="CI" src="https://img.shields.io/badge/CI-passing-22c55e?style=for-the-badge" />
   </a>
 </p>
@@ -28,7 +28,7 @@
   <a href="docs/tutorial.md">Tutorial</a> ·
   <a href="docs/README.md">Documentation</a> ·
   <a href="docs/cli.md">CLI Reference</a> ·
-  <a href="https://hex.pm/packages/refrakt">Hex Package</a> ·
+  <a href="https://hex.pm/packages/mastro">Hex Package</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -36,24 +36,28 @@
 
 ---
 
-Light enters a prism, structure emerges. Refrakt takes the Gleam ecosystem — [Wisp](https://github.com/gleam-wisp/wisp), [Lustre](https://github.com/lustre-labs/lustre), [Mist](https://github.com/rawhat/mist) — and gives you one obvious way to build serious web apps. No macros. No magic. Just conventions, generators, and plain Gleam code you own.
+Mastro is a fork of [Refrakt](https://github.com/raskell-io/refrakt) (MIT) by
+[raskell-io](https://github.com/raskell-io), extended with the Amarra
+HTML-first contract (Drive, Stream, Live, kit).
 
-**One command, full CRUD.** `refrakt gen resource posts title:string body:text published:bool` generates a handler with 7 actions, Lustre HTML views, typed form validation, a domain type, database repo with raw SQL, a migration, and tests — then wires all routes into your router automatically.
+Light enters a prism, structure emerges. Mastro takes the Gleam ecosystem — [Wisp](https://github.com/gleam-wisp/wisp), [Lustre](https://github.com/lustre-labs/lustre), [Mist](https://github.com/rawhat/mist) — and gives you one obvious way to build serious web apps. No macros. No magic. Just conventions, generators, and plain Gleam code you own.
+
+**One command, full CRUD.** `mastro gen resource posts title:string body:text published:bool` generates a handler with 7 actions, Lustre HTML views, typed form validation, a domain type, database repo with raw SQL, a migration, and tests — then wires all routes into your router automatically.
 
 <br>
 
 ## Quick Start
 
 ```bash
-# Add refrakt to a Gleam project (or use it standalone)
-gleam add refrakt
+# Add mastro to a Gleam project (or use it standalone)
+gleam add mastro
 
 # Create a new project with PostgreSQL
-gleam run -m refrakt/cli -- new my_app --db postgres
+gleam run -m mastro/cli -- new my_app --db postgres
 cd my_app
 
 # Generate a full CRUD resource
-gleam run -m refrakt/cli -- gen resource posts title:string body:text published:bool
+gleam run -m mastro/cli -- gen resource posts title:string body:text published:bool
 
 # Start the server
 gleam run
@@ -63,7 +67,7 @@ gleam run
 Or with SQLite — no external database needed:
 
 ```bash
-gleam run -m refrakt/cli -- new my_app --db sqlite
+gleam run -m mastro/cli -- new my_app --db sqlite
 ```
 
 <br>
@@ -124,18 +128,18 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 
 | Command | Description |
 |---------|-------------|
-| `refrakt new <name>` | Create a new project (`--db postgres`, `--db sqlite`) |
-| `refrakt gen resource <name> <fields>` | Full CRUD — handler, views, form, domain, repo, migration, tests |
-| `refrakt gen resource <name> <fields> --api` | JSON API — handler, domain, repo, migration (no views) |
-| `refrakt gen page <name>` | Static page — handler + route |
-| `refrakt gen auth` | Authentication — login, register, logout, sessions, middleware |
-| `refrakt gen island <name>` | Lustre interactive island (client-side) |
-| `refrakt gen live <name>` | Lustre server component (real-time over WebSocket) |
-| `refrakt gen migration <name>` | SQL migration file |
-| `refrakt migrate` | Run pending migrations |
-| `refrakt build` | Compile Lustre islands to JavaScript |
-| `refrakt dev` | Dev server with file watching (auto-rebuild) |
-| `refrakt routes` | Print the route table |
+| `mastro new <name>` | Create a new project (`--db postgres`, `--db sqlite`) |
+| `mastro gen resource <name> <fields>` | Full CRUD — handler, views, form, domain, repo, migration, tests |
+| `mastro gen resource <name> <fields> --api` | JSON API — handler, domain, repo, migration (no views) |
+| `mastro gen page <name>` | Static page — handler + route |
+| `mastro gen auth` | Authentication — login, register, logout, sessions, middleware |
+| `mastro gen island <name>` | Lustre interactive island (client-side) |
+| `mastro gen live <name>` | Lustre server component (real-time over WebSocket) |
+| `mastro gen migration <name>` | SQL migration file |
+| `mastro migrate` | Run pending migrations |
+| `mastro build` | Compile Lustre islands to JavaScript |
+| `mastro dev` | Dev server with file watching (auto-rebuild) |
+| `mastro routes` | Print the route table |
 
 <br>
 
@@ -145,9 +149,9 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 
 **Generated code is your code** — Every file the CLI creates is plain Gleam you can read, modify, and own. No hidden framework internals.
 
-**No magic** — Routing is pattern matching. Views are functions. Validation is functions. If you can read Gleam, you can read a Refrakt app.
+**No magic** — Routing is pattern matching. Views are functions. Validation is functions. If you can read Gleam, you can read a Mastro app.
 
-**Build on the ecosystem** — Wisp handles HTTP. Lustre handles HTML. Mist runs the server. Pog or Sqlight talk to the database. Refrakt adds conventions and generators — it doesn't reinvent the stack.
+**Build on the ecosystem** — Wisp handles HTTP. Lustre handles HTML. Mist runs the server. Pog or Sqlight talk to the database. Mastro adds conventions and generators — it doesn't reinvent the stack.
 
 <br>
 
@@ -178,11 +182,11 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 ### Blog (PostgreSQL)
 
 ```bash
-gleam run -m refrakt/cli -- new blog --db postgres
+gleam run -m mastro/cli -- new blog --db postgres
 cd blog
-gleam run -m refrakt/cli -- gen resource posts title:string body:text published:bool
-gleam run -m refrakt/cli -- gen auth
-gleam run -m refrakt/cli -- gen page about
+gleam run -m mastro/cli -- gen resource posts title:string body:text published:bool
+gleam run -m mastro/cli -- gen auth
+gleam run -m mastro/cli -- gen page about
 ```
 
 See [`examples/blog/`](examples/blog/) for the complete app.
@@ -190,9 +194,9 @@ See [`examples/blog/`](examples/blog/) for the complete app.
 ### Tasks (SQLite)
 
 ```bash
-gleam run -m refrakt/cli -- new tasks_app --db sqlite
+gleam run -m mastro/cli -- new tasks_app --db sqlite
 cd tasks_app
-gleam run -m refrakt/cli -- gen resource tasks title:string completed:bool
+gleam run -m mastro/cli -- gen resource tasks title:string completed:bool
 ```
 
 See [`examples/tasks_app/`](examples/tasks_app/) for the complete app.
@@ -204,7 +208,7 @@ See [`examples/tasks_app/`](examples/tasks_app/) for the complete app.
 | Guide | Description |
 |-------|-------------|
 | [Installation](docs/installation.md) | Prerequisites, install, first project |
-| [Tutorial: Build a Blog](docs/tutorial.md) | 10 steps from `refrakt new` to working app |
+| [Tutorial: Build a Blog](docs/tutorial.md) | 10 steps from `mastro new` to working app |
 | [Project Structure](docs/project-structure.md) | Directory layout, three layers, dependency flow |
 | [Routing](docs/routing.md) | Pattern matching, params, middleware |
 | [Handlers](docs/handlers.md) | Request handling, responses, JSON |
@@ -236,8 +240,8 @@ See [`examples/tasks_app/`](examples/tasks_app/) for the complete app.
 ## Building from Source
 
 ```bash
-git clone https://github.com/raskell-io/refrakt.git
-cd refrakt
+git clone https://github.com/puppe1990/mastro.git
+cd mastro
 
 # Install toolchain
 mise install   # Gleam 1.14, Erlang 27, rebar3

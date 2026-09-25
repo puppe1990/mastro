@@ -1,4 +1,4 @@
-# Refrakt - mise configuration
+# Mastro - mise configuration
 # https://mise.jdx.dev/
 
 [tools]
@@ -75,19 +75,19 @@ depends = ["check", "test"]
 # =============================================================================
 
 [tasks."cli:new"]
-description = "Test refrakt new (creates test_app/)"
-run = "gleam run -m refrakt_cli -- new test_app --db postgres"
+description = "Test mastro new (creates test_app/)"
+run = "gleam run -m mastro/cli -- new test_app --db postgres"
 
 [tasks."cli:gen"]
-description = "Test refrakt gen resource inside test_app/"
-run = "cd test_app && gleam run -m refrakt_cli -- gen resource posts title:string body:text published:bool"
+description = "Test mastro gen resource inside test_app/"
+run = "cd test_app && gleam run -m mastro/cli -- gen resource posts title:string body:text published:bool"
 
 [tasks."cli:clean"]
 description = "Remove test_app/ created by cli:new"
 run = "rm -rf test_app/"
 
 [tasks."cli:build"]
-description = "Build the standalone refrakt CLI binary"
+description = "Build the standalone mastro CLI binary"
 run = "./bin/build-cli.sh"
 
 # =============================================================================

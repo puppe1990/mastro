@@ -1,6 +1,6 @@
 # Blog Example
 
-A blog application built with [Refrakt](https://github.com/raskell-io/refrakt).
+A blog application built with [Mastro](https://github.com/puppe1990/mastro).
 
 ## Features
 
@@ -28,4 +28,4 @@ gleam run
 
 ## Routes
 
-Run `gleam run -m refrakt/cli -- routes` to see all routes.
+Run `gleam run -m mastro/cli -- routes` to see all routes.

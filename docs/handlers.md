@@ -111,7 +111,7 @@ pub fn search(req: Request, ctx: Context) -> Response {
 Set a flash message on redirect:
 
 ```gleam
-import refrakt/flash
+import mastro/flash
 
 pub fn create(req: Request, ctx: Context) -> Response {
   // ... create the post ...
@@ -181,5 +181,5 @@ pub fn index(_req: Request, _ctx: Context) -> Response {
 Or use the generator:
 
 ```bash
-refrakt gen page dashboard
+mastro gen page dashboard
 ```

@@ -1,5 +1,5 @@
 import gleam/int
-import refrakt/flash
+import mastro/flash
 import tasks_app/context.{type Context}
 import tasks_app/data/task_repo
 import tasks_app/web/error_handler

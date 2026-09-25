@@ -21,7 +21,7 @@ Naming, structure, and code patterns for generated code.
 
 ### Pluralization
 
-- Resource names in CLI commands are **plural**: `refrakt gen resource posts`
+- Resource names in CLI commands are **plural**: `mastro gen resource posts`
 - Generated files use **singular**: `post_handler.gleam`, `post.gleam`
 - Routes use **plural**: `/posts`, `/posts/:id`
 - Types use **singular**: `Post`, `PostForm`, `PostParams`
@@ -152,12 +152,12 @@ post_views.index_view(posts)
 Set on redirect:
 ```gleam
 wisp.redirect("/posts")
-|> refrakt.set_flash(req, "info", "Post created")
+|> mastro.set_flash(req, "info", "Post created")
 ```
 
 Read in layout/component:
 ```gleam
-let flash = refrakt.get_flash(req, "info")
+let flash = mastro.get_flash(req, "info")
 ```
 
 ---

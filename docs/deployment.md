@@ -1,6 +1,6 @@
 # Deployment
 
-Refrakt apps are Gleam applications targeting the Erlang/BEAM runtime.
+Mastro apps are Gleam applications targeting the Erlang/BEAM runtime.
 Deploy them like any BEAM application.
 
 ## Build for production
@@ -107,7 +107,7 @@ psql $DATABASE_URL < src/my_app/data/migrations/001_create_posts.sql
 Or use the programmatic migration runner in your app startup:
 
 ```gleam
-import refrakt/migrate
+import mastro/migrate
 
 pub fn main() {
   // ... connect to database ...

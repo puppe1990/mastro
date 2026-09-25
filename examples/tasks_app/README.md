@@ -1,6 +1,6 @@
 # Tasks App Example
 
-A task management app built with [Refrakt](https://github.com/raskell-io/refrakt) and SQLite.
+A task management app built with [Mastro](https://github.com/puppe1990/mastro) and SQLite.
 
 ## Features
 

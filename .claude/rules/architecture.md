@@ -4,17 +4,17 @@
 
 ## Two Packages, Not One
 
-Refrakt ships as two separate packages:
+Mastro ships as two separate packages:
 
-1. **`refrakt`** (library) — runtime helpers imported by generated projects
-2. **`refrakt_cli`** (CLI) — code generator, development tool only
+1. **`mastro`** (library) — runtime helpers imported by generated projects
+2. **`mastro_cli`** (CLI) — code generator, development tool only
 
-The CLI is never a runtime dependency. Generated code imports `refrakt`,
-`wisp`, `lustre`, and database drivers — not `refrakt_cli`.
+The CLI is never a runtime dependency. Generated code imports `mastro`,
+`wisp`, `lustre`, and database drivers — not `mastro_cli`.
 
 ## Build On the Ecosystem
 
-Refrakt does not replace Wisp, Lustre, or Mist. It wraps and composes them.
+Mastro does not replace Wisp, Lustre, or Mist. It wraps and composes them.
 
 | Concern | Owned By |
 |---------|----------|
@@ -23,18 +23,18 @@ Refrakt does not replace Wisp, Lustre, or Mist. It wraps and composes them.
 | HTML rendering | Lustre |
 | HTTP server | Mist |
 | Database queries | Pog / Sqlight |
-| Routing conventions | Refrakt |
-| Form validation | Refrakt |
-| Code generation | Refrakt CLI |
-| Migration runner | Refrakt |
-| Flash messages | Refrakt |
-| Test helpers | Refrakt |
+| Routing conventions | Mastro |
+| Form validation | Mastro |
+| Code generation | Mastro CLI |
+| Migration runner | Mastro |
+| Flash messages | Mastro |
+| Test helpers | Mastro |
 
 **If Wisp or Lustre already does it, don't rebuild it.**
 
 ## BEAM Only
 
-Refrakt targets the Erlang/BEAM runtime. No JavaScript target support.
+Mastro targets the Erlang/BEAM runtime. No JavaScript target support.
 This simplifies everything: one compilation target, one server model,
 OTP process supervision, Mist as the blessed HTTP server.
 
@@ -42,7 +42,7 @@ OTP process supervision, Mist as the blessed HTTP server.
 
 Generated code must be:
 
-1. **Readable** — A developer who has never seen Refrakt should understand
+1. **Readable** — A developer who has never seen Mastro should understand
    a generated file without consulting documentation.
 2. **Idiomatic** — It should look like code a skilled Gleam developer
    would write by hand.
@@ -75,7 +75,7 @@ no pog, no sqlight. Pure Gleam types and functions.
 
 ## Library Surface Area
 
-The `refrakt` library must stay small. It provides:
+The `mastro` library must stay small. It provides:
 
 1. Validation helpers — composable, return error lists
 2. Flash messages — built on signed cookies
@@ -99,7 +99,7 @@ It does not:
 - Run at runtime
 - Do metaprogramming
 - Modify code beyond router patches
-- Manage processes or servers (except `refrakt dev` wrapping `gleam run`)
+- Manage processes or servers (except `mastro dev` wrapping `gleam run`)
 
 ## No ORM
 

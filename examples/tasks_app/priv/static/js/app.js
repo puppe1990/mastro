@@ -1,2 +1,2 @@
-// Refrakt client-side JavaScript
+// Mastro client-side JavaScript
 // Add your client-side code here.

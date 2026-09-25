@@ -1,6 +1,6 @@
 # Views & Templates
 
-Refrakt uses Lustre's HTML functions for templating. Views are plain
+Mastro uses Lustre's HTML functions for templating. Views are plain
 Gleam functions that return `Element(Nil)`. No template language, no
 string interpolation, no macros.
 
@@ -167,7 +167,7 @@ case show_sidebar {
 
 ## Generated views
 
-`refrakt gen resource posts title:string body:text published:bool`
+`mastro gen resource posts title:string body:text published:bool`
 creates three view functions:
 
 - `index_view(posts)` — list all items with links

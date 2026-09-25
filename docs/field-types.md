@@ -1,19 +1,19 @@
 # Field Types
 
-Field types are used with `refrakt gen resource` to define the
+Field types are used with `mastro gen resource` to define the
 fields of a resource.
 
 ## Syntax
 
 ```bash
-refrakt gen resource <name> <field:type> [field:type ...]
+mastro gen resource <name> <field:type> [field:type ...]
 ```
 
 Example:
 
 ```bash
-refrakt gen resource posts title:string body:text published:bool
-refrakt gen resource products name:string price:float stock:int
+mastro gen resource posts title:string body:text published:bool
+mastro gen resource products name:string price:float stock:int
 ```
 
 ## Available types

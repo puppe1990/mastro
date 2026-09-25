@@ -1,6 +1,6 @@
 # Authentication
 
-`refrakt gen auth` generates a complete authentication system —
+`mastro gen auth` generates a complete authentication system —
 registration, login, logout, password hashing, and session management.
 It's real code in your project, not a library. You own it and can
 modify everything.
@@ -8,7 +8,7 @@ modify everything.
 ## Generate auth
 
 ```bash
-refrakt gen auth
+mastro gen auth
 ```
 
 This creates 9 files:

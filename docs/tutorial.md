@@ -1,4 +1,4 @@
-# Build a Blog with Refrakt
+# Build a Blog with Mastro
 
 This tutorial walks you through building a blog application from scratch.
 By the end, you'll have posts with CRUD, user authentication, and an
@@ -7,7 +7,7 @@ about page — all running on Gleam.
 **Prerequisites:**
 - Gleam 1.14+ and Erlang/OTP 27+
 - PostgreSQL running locally
-- `refrakt` published on Hex (or use a path dependency for now)
+- `mastro` published on Hex (or use a path dependency for now)
 
 **Time:** ~10 minutes
 
@@ -16,7 +16,7 @@ about page — all running on Gleam.
 ## 1. Create the project
 
 ```bash
-refrakt new blog --db postgres
+mastro new blog --db postgres
 cd blog
 ```
 
@@ -60,7 +60,7 @@ by default. No configuration needed for local development.
 ## 3. Generate a posts resource
 
 ```bash
-refrakt gen resource posts title:string body:text published:bool
+mastro gen resource posts title:string body:text published:bool
 ```
 
 This creates 7 files and patches the router:
@@ -78,7 +78,7 @@ This creates 7 files and patches the router:
 Look at the router — it now has RESTful routes:
 
 ```bash
-refrakt routes
+mastro routes
 ```
 
 ```
@@ -167,7 +167,7 @@ No framework magic.
 ## 7. Add authentication
 
 ```bash
-refrakt gen auth
+mastro gen auth
 ```
 
 This generates a complete auth system:
@@ -192,7 +192,7 @@ psql blog_dev < src/blog/data/migrations/002_create_users.sql
 Check the routes:
 
 ```bash
-refrakt routes
+mastro routes
 ```
 
 New auth routes appear:
@@ -225,7 +225,7 @@ redirects to `/login` if there's no session.
 ## 9. Add a page
 
 ```bash
-refrakt gen page about
+mastro gen page about
 ```
 
 This creates a handler and patches the router. Edit
@@ -235,7 +235,7 @@ This creates a handler and patches the router. Edit
 pub fn index(_req: Request, _ctx: Context) -> Response {
   section([class("about")], [
     h1([], [text("About This Blog")]),
-    p([], [text("Built with Refrakt and Gleam.")]),
+    p([], [text("Built with Mastro and Gleam.")]),
   ])
   |> root_layout.wrap("About")
   |> wisp.html_response(200)
@@ -274,7 +274,7 @@ There is no "framework code" vs "your code" distinction.
 
 - Edit the CSS in `priv/static/css/app.css`
 - Add more fields to posts (edit `domain/post.gleam` and the repo)
-- Add comments as a second resource: `refrakt gen resource comments ...`
+- Add comments as a second resource: `mastro gen resource comments ...`
 - Deploy with [Vela](https://github.com/raskell-io/vela) or `gleam export erlang-shipment`
 
 ---
