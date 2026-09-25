@@ -264,6 +264,36 @@ Wraps `gleam run` with the dev environment variable set.
 
 ---
 
+### `mastro doctor [--mobile]`
+
+Check the app against the Amarra contract and print one line per check.
+Exits `1` when anything fails.
+
+```bash
+mastro doctor
+mastro doctor --mobile
+```
+
+Core checks: the mastro dependency, `priv/static/`, the layout rendering
+`#amarra-main`, `priv/static/js/amarra.js`, `manifest.webmanifest`, the
+service worker, the jobs dashboard and the icon/og placeholders.
+
+`--mobile` adds the on-device checks: flash inside `#amarra-main`, no
+`fonts.googleapis.com` in the source (blocked by the default CSP),
+`amarra.js` served network-first in `sw.js`, the `#chat-messages`
+container, and `GET /health` returning `lan_urls`.
+
+```
+mastro doctor
+  [ok  ] dependency: gleam.toml depends on mastro
+  [ok  ] static: priv/static/ exists
+  [fail] amarra.js: priv/static/js/amarra.js is missing — run `mastro pwa` to install the default assets
+  ...
+  1 failed, 3 warning(s)
+```
+
+---
+
 ### `mastro help`
 
 Show the help message with all commands.

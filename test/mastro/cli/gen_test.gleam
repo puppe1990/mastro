@@ -3,7 +3,9 @@
 /// These tests run generators in a temp directory and verify the output
 /// files exist and contain expected content.
 ///
+import gleam/dict
 import gleam/list
+import gleam/result
 import gleam/string
 import gleeunit/should
 import mastro/cli/gen
@@ -11,6 +13,7 @@ import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
 import mastro/cli/types
+import mastro/doctor
 import simplifile
 
 // =============================================================================
@@ -139,6 +142,40 @@ pub fn new_app_wires_dev_logs_and_the_banner_test() {
       "dev_log.request_log",
     )
     |> should.be_true
+  })
+}
+
+// =============================================================================
+// doctor
+// =============================================================================
+
+pub fn doctor_fails_on_a_fresh_sqlite_app_without_amarra_js_test() {
+  in_temp_dir("doctor", fn(dir) {
+    let project_dir = dir <> "/doc_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    let files =
+      dict.from_list([
+        #("gleam.toml", simplifile.read("gleam.toml") |> result.unwrap("")),
+        #(
+          "src/doc_app/web/layouts/root_layout.gleam",
+          simplifile.read("src/doc_app/web/layouts/root_layout.gleam")
+            |> result.unwrap(""),
+        ),
+      ])
+
+    let report = doctor.run(files, False)
+    doctor.has_failures(report) |> should.be_true
+
+    let assert Ok(amarra) =
+      list.find(report.checks, fn(check) { check.name == "amarra.js" })
+    amarra.level |> should.equal(doctor.Fail)
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
   })
 }
 
