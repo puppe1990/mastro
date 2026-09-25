@@ -25,6 +25,6 @@
 
 ## Architecture
 
-- [ADR 0001 — View layer](adr/0001-view-layer.md) — Lustre nativo vs templates HTML em runtime (proposto)
+- [ADR 0001 — View layer](adr/0001-view-layer.md) — Lustre nativo vs templates HTML em runtime (aceito)
 - [Lustre Integration](lustre-integration.md) — interactive islands and server components
 - [Golden Path](GOLDEN_PATH.md) — original design spec (internal)
