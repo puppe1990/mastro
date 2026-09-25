@@ -73,6 +73,30 @@ API: 5 routes under `/api/` prefix).
 
 **Field types:** See [Field Types](field-types.md).
 
+**Foreign keys:** mark a field with `:references` (or `:belongs_to`) and it
+becomes an `<field>_id` column backed by a foreign key, with a
+`<parent>_options` function in the repo for select inputs:
+
+```bash
+mastro gen resource posts title:string author:references
+# author_id INTEGER NOT NULL REFERENCES authors(id)
+```
+
+**Flags:**
+
+| Flag | Effect |
+|------|--------|
+| `--api` | JSON API mode (no views/forms, routes under `/api/`) |
+| `--public` | Public list (no admin gate) |
+| `--paginate` | 25 rows per page with `<.pagination>` |
+| `--no-seed` | Skip the demo seed |
+| `--admin-auth session\|bearer` | Admin auth for the resource (default `session`) |
+
+**Index:** the generated `list/5` takes `(search, sort, dir, page)`.
+`search` is a `LIKE` on the display field, `sort` is only honoured for
+whitelisted columns (anything else — including a bad direction — falls
+back safely via `mastro/query`), and `page` is 25 rows.
+
 **Naming:** The resource name should be plural (`posts`, not `post`).
 The generator singularizes it for types (`Post`) and file names
 (`post_handler.gleam`).

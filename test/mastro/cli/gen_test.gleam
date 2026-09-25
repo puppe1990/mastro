@@ -346,6 +346,40 @@ pub fn doctor_fails_on_a_fresh_sqlite_app_without_amarra_js_test() {
 // gen resource (runs inside a generated project)
 // =============================================================================
 
+pub fn resource_reference_adds_foreign_key_and_options_test() {
+  in_temp_dir("resource_fk", fn(dir) {
+    let project_dir = dir <> "/fk_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string", "author:references"])
+
+    file_contains(
+      "src/fk_app/data/migrations/001_create_posts.sql",
+      "author_id INTEGER NOT NULL REFERENCES authors(id)",
+    )
+    |> should.be_true
+    file_contains("src/fk_app/domain/post.gleam", "author_id: Int")
+    |> should.be_true
+    file_contains("src/fk_app/data/post_repo.gleam", "pub fn author_options(")
+    |> should.be_true
+    file_contains("src/fk_app/data/post_repo.gleam", "query.order_by(sort, dir")
+    |> should.be_true
+    file_contains(
+      "src/fk_app/data/post_repo.gleam",
+      "query.like_pattern(search)",
+    )
+    |> should.be_true
+    file_contains("src/fk_app/web/post_handler.gleam", "query.parse(req.query)")
+    |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
 pub fn gen_resource_creates_all_files_test() {
   in_temp_dir("gen_resource", fn(dir) {
     let project_dir = dir <> "/res_app"
