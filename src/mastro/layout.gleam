@@ -13,9 +13,14 @@ pub const main_id = "amarra-main"
 
 pub const toast_host_id = "amarra-toast-host"
 
+pub const theme_key = "amarra-theme"
+
+/// Inlined before CSS so a stored light theme does not flash dark.
+const fouc_script = "try{if(localStorage.getItem(\"amarra-theme\")===\"light\"){document.documentElement.classList.add(\"light\")}}catch(e){}"
+
 pub fn app(inner: Element(Nil), title: String) -> String {
   html.html([], [
-    html.head([], [html.title([], title)]),
+    html.head([], [html.title([], title), html.script([], fouc_script)]),
     html.body([], [
       html.nav([attribute.id(nav_id)], []),
       html.main([attribute.id(main_id)], [inner]),
