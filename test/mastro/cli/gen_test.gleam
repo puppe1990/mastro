@@ -7,7 +7,9 @@ import gleam/list
 import gleam/string
 import gleeunit/should
 import mastro/cli/gen
+import mastro/cli/migrate_cmd
 import mastro/cli/new
+import mastro/cli/types
 import simplifile
 
 // =============================================================================
@@ -265,6 +267,71 @@ pub fn gen_island_creates_files_test() {
       "pub fn render()",
     )
     |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+// =============================================================================
+// migrations and the database module
+// =============================================================================
+
+pub fn gen_migration_writes_up_and_down_sections_test() {
+  in_temp_dir("gen_migration", fn(dir) {
+    let project_dir = dir <> "/mig_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.migration("add_email")
+
+    let path = "src/mig_app/data/migrations/001_add_email.sql"
+    file_contains(path, "-- up") |> should.be_true
+    file_contains(path, "-- down") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn resource_migration_carries_its_own_rollback_test() {
+  in_temp_dir("resource_down", fn(dir) {
+    let project_dir = dir <> "/roll_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+
+    let path = "src/roll_app/data/migrations/001_create_posts.sql"
+    file_contains(path, "-- up") |> should.be_true
+    file_contains(path, "DROP TABLE posts;") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn db_module_answers_every_subcommand_test() {
+  in_temp_dir("db_module", fn(dir) {
+    let project_dir = dir <> "/db_app"
+    new.run(project_dir, ["--db", "postgres"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    migrate_cmd.ensure_module("db_app", types.Postgres)
+
+    let path = "src/db_app/migrate.gleam"
+    file_exists(path) |> should.be_true
+    file_contains(path, "\"status\"") |> should.be_true
+    file_contains(path, "\"rollback\"") |> should.be_true
+    file_contains(path, "\"prune-sessions\"") |> should.be_true
+    file_contains(path, "migrate.run(") |> should.be_true
+    file_contains(path, "migrate.rollback(") |> should.be_true
 
     let assert Ok(_) = set_cwd(cwd)
     Nil
