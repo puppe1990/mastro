@@ -9,6 +9,7 @@ import mastro/cli/assets
 import mastro/cli/build
 import mastro/cli/db
 import mastro/cli/dev
+import mastro/cli/doctor
 import mastro/cli/gen
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
@@ -35,6 +36,7 @@ pub fn main() {
     ["assets", ..] -> assets.setup()
     ["seed", ..] -> seed.run()
     ["dev", ..] -> dev.run()
+    ["doctor", ..args] -> doctor.run(args)
     ["help", ..] | ["--help", ..] | ["-h", ..] -> print_help()
     ["version", ..] | ["--version", ..] | ["-v", ..] ->
       io.println("mastro 0.2.0")
@@ -79,6 +81,7 @@ fn print_help() {
       "  assets setup                      Set up Tailwind CSS",
       "  assets build                      Build CSS/JS assets",
       "  dev                               Start the dev server",
+      "  doctor [--mobile]                 Check the app against the Amarra contract",
       "",
       "  help                              Show this help",
       "  version                           Show version",
