@@ -2,7 +2,7 @@
 
 ## Status
 
-Refrakt already uses Lustre for server-side HTML rendering. Every view
+Mastro already uses Lustre for server-side HTML rendering. Every view
 is a Lustre `Element(Nil)` rendered via `element.to_document_string`.
 
 Phase 2 adds **interactive islands** — Lustre client-side apps embedded
@@ -17,12 +17,12 @@ in server-rendered pages, and optionally Lustre server components
 - Views are Lustre HTML functions
 - `Element(Nil)` → `String` via `element.to_document_string`
 - No client JavaScript beyond `app.js`
-- This is the default `refrakt new` experience
+- This is the default `mastro new` experience
 
 **Mode 2: Interactive islands**
 - Server renders the page shell
 - Specific areas mount a Lustre client-side app
-- `refrakt gen island <name>` creates a Lustre `application` module
+- `mastro gen island <name>` creates a Lustre `application` module
 - The island JS is bundled separately and loaded on the page
 - Communication: the island reads data from HTML attributes or
   a JSON script tag placed by the server
@@ -30,13 +30,13 @@ in server-rendered pages, and optionally Lustre server components
 **Mode 3: Server components (future)**
 - Lustre app runs on the server, patches DOM over WebSocket
 - Requires Mist WebSocket wiring
-- `refrakt gen live <name>` creates the component + transport
+- `mastro gen live <name>` creates the component + transport
 - This is the LiveView-equivalent
 
 ## gen island (Mode 2)
 
 ```
-refrakt gen island counter
+mastro gen island counter
 ```
 
 Creates:
@@ -138,12 +138,12 @@ gleam build --target javascript
 cp build/dev/javascript/*/main.mjs ../priv/static/js/islands/counter.js
 ```
 
-A future `refrakt build` command could automate this.
+A future `mastro build` command could automate this.
 
 ## gen live (Mode 3 — future)
 
 ```
-refrakt gen live dashboard
+mastro gen live dashboard
 ```
 
 Creates:
@@ -164,15 +164,15 @@ This requires:
 ## Recommended implementation order
 
 1. Document the island pattern (this file) ✓
-2. Add `refrakt gen island` command
-3. Add `islands/` directory convention to `refrakt new`
+2. Add `mastro gen island` command
+3. Add `islands/` directory convention to `mastro new`
 4. Write an example with one interactive island
-5. Later: add `refrakt gen live` for server components
-6. Later: automate JS build in `refrakt build`
+5. Later: add `mastro gen live` for server components
+6. Later: automate JS build in `mastro build`
 
 ## Non-goals
 
-- Refrakt does not build its own client runtime
-- Refrakt does not replace Lustre's architecture
-- Refrakt does not add a custom WebSocket protocol
+- Mastro does not build its own client runtime
+- Mastro does not replace Lustre's architecture
+- Mastro does not add a custom WebSocket protocol
 - Server components use Lustre's existing transport format

@@ -1,9 +1,9 @@
-# Refrakt Documentation
+# Mastro Documentation
 
 ## Getting Started
 
-- [Installation](installation.md) — install Refrakt and create your first project
-- [Tutorial: Build a Blog](tutorial.md) — step-by-step guide from `refrakt new` to working app
+- [Installation](installation.md) — install Mastro and create your first project
+- [Tutorial: Build a Blog](tutorial.md) — step-by-step guide from `mastro new` to working app
 
 ## Guides
 
@@ -19,7 +19,7 @@
 
 ## Reference
 
-- [CLI Commands](cli.md) — all `refrakt` commands and flags
+- [CLI Commands](cli.md) — all `mastro` commands and flags
 - [Configuration](configuration.md) — config.gleam, environment variables
 - [Field Types](field-types.md) — types available for `gen resource`
 

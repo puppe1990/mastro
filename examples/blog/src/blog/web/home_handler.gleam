@@ -9,7 +9,7 @@ pub fn index(_req: Request, _ctx: Context) -> Response {
   section([class("hero")], [
     h1([], [text("Welcome to blog")]),
     p([], [
-      text("Built with Refrakt — a convention-first web framework for Gleam."),
+      text("Built with Mastro — a convention-first web framework for Gleam."),
     ]),
   ])
   |> root_layout.wrap("Home")

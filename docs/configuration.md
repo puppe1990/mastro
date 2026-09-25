@@ -1,6 +1,6 @@
 # Configuration
 
-Refrakt uses environment variables for configuration. The generated
+Mastro uses environment variables for configuration. The generated
 `config.gleam` reads them at startup and returns a typed `Config`
 record.
 
@@ -117,7 +117,7 @@ pub type Context {
 
 ## No .env files
 
-Refrakt does not read `.env` files. Set environment variables using
+Mastro does not read `.env` files. Set environment variables using
 your shell, a process manager, or your deployment tool:
 
 ```bash

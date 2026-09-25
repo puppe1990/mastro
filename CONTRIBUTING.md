@@ -1,12 +1,12 @@
-# Contributing to Refrakt
+# Contributing to Mastro
 
-Thanks for your interest in contributing to Refrakt.
+Thanks for your interest in contributing to Mastro.
 
 ## Setup
 
 ```bash
-git clone https://github.com/raskell-io/refrakt.git
-cd refrakt
+git clone https://github.com/puppe1990/mastro.git
+cd mastro
 
 # Install toolchain (Gleam 1.14, Erlang 27, rebar3)
 mise install
@@ -35,28 +35,28 @@ All three must pass. There are no exceptions.
 
 ```
 src/
-  refrakt.gleam              ← library entry point
-  refrakt/
+  mastro.gleam              ← library entry point
+  mastro/
     validate.gleam           ← validation helpers
     flash.gleam              ← flash message helpers
     migrate.gleam            ← migration runner
     testing.gleam            ← test helpers
     cli.gleam                ← CLI entry point
     cli/
-      new.gleam              ← refrakt new
+      new.gleam              ← mastro new
       gen.gleam              ← gen resource, gen page, gen auth, gen island
       templates.gleam        ← file content templates
-      routes.gleam           ← refrakt routes
-      build.gleam            ← refrakt build (island JS)
-      dev.gleam              ← refrakt dev
-      migrate_cmd.gleam      ← refrakt migrate
+      routes.gleam           ← mastro routes
+      build.gleam            ← mastro build (island JS)
+      dev.gleam              ← mastro dev
+      migrate_cmd.gleam      ← mastro migrate
       project.gleam          ← gleam.toml reader
       format.gleam           ← post-generation formatting
       types.gleam             ← shared types (DbChoice)
 
 test/
-  refrakt_test.gleam         ← unit tests (validation)
-  refrakt/cli/
+  mastro_test.gleam         ← unit tests (validation)
+  mastro/cli/
     gen_test.gleam           ← integration tests (generators)
 
 docs/                        ← user documentation
@@ -77,7 +77,7 @@ examples/
 1. Add the template function(s) in `gen.gleam` or `templates.gleam`
 2. Add the public function in `gen.gleam`
 3. Add the command match in `cli.gleam`
-4. Add an integration test in `test/refrakt/cli/gen_test.gleam`
+4. Add an integration test in `test/mastro/cli/gen_test.gleam`
 5. Update `docs/cli.md`
 
 ## Adding a new field type
@@ -99,7 +99,7 @@ examples/
 
 ## Reporting issues
 
-- Use [GitHub Issues](https://github.com/raskell-io/refrakt/issues)
+- Use [GitHub Issues](https://github.com/puppe1990/mastro/issues)
 - Include the Gleam version (`gleam --version`)
 - Include the command that failed and the full error output
 - If a generated file is wrong, include the generated file content

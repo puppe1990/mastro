@@ -11,7 +11,7 @@ envoy = ">= 1.1.0 and < 2.0.0"
 mist = ">= 5.0.0 and < 6.0.0"
 wisp = ">= 2.2.0 and < 3.0.0"
 lustre = ">= 5.6.0 and < 6.0.0"
-refrakt = { path = "../.." }
+mastro = { path = "../.." }
 pog = ">= 4.1.0 and < 5.0.0"
 
 [dev-dependencies]

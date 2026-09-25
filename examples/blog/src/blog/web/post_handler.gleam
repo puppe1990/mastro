@@ -5,7 +5,7 @@ import blog/web/forms/post_form
 import blog/web/layouts/root_layout
 import blog/web/post_views
 import gleam/int
-import refrakt/flash
+import mastro/flash
 import wisp.{type Request, type Response}
 
 pub fn index(_req: Request, ctx: Context) -> Response {

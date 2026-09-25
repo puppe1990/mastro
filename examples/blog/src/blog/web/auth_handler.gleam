@@ -6,7 +6,7 @@ import blog/web/error_handler
 import blog/web/forms/auth_form
 import blog/web/layouts/root_layout
 import gleam/int
-import refrakt/flash
+import mastro/flash
 import wisp.{type Request, type Response}
 
 pub fn login_page(_req: Request, _ctx: Context) -> Response {

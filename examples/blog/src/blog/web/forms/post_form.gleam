@@ -2,7 +2,7 @@ import blog/domain/post.{type Post}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import refrakt/validate
+import mastro/validate
 import wisp
 
 pub type PostForm {

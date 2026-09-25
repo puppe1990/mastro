@@ -2,7 +2,7 @@
 
 > Gleam 1.14+, BEAM target
 
-These standards apply to all Gleam code in Refrakt — both the framework
+These standards apply to all Gleam code in Mastro — both the framework
 packages and the code generators produce.
 
 ---

@@ -1,28 +1,28 @@
 # CLI Commands
 
-The Refrakt CLI is a code generator. Run it with:
+The Mastro CLI is a code generator. Run it with:
 
 ```bash
-gleam run -m refrakt/cli -- <command>
+gleam run -m mastro/cli -- <command>
 ```
 
 Or set up an alias:
 
 ```bash
-alias refrakt='gleam run -m refrakt/cli --'
+alias mastro='gleam run -m mastro/cli --'
 ```
 
 ## Commands
 
-### `refrakt new <name>`
+### `mastro new <name>`
 
-Create a new Refrakt project.
+Create a new Mastro project.
 
 ```bash
-refrakt new my_app
-refrakt new my_app --db postgres
-refrakt new my_app --db sqlite
-refrakt new path/to/my_app    # extracts "my_app" as package name
+mastro new my_app
+mastro new my_app --db postgres
+mastro new my_app --db sqlite
+mastro new path/to/my_app    # extracts "my_app" as package name
 ```
 
 **Flags:**
@@ -38,17 +38,17 @@ CSS, tests, and optionally a database repo.
 
 ---
 
-### `refrakt gen resource <name> <fields...>`
+### `mastro gen resource <name> <fields...>`
 
 Generate a full CRUD resource.
 
 ```bash
-refrakt gen resource posts title:string body:text published:bool
-refrakt gen resource comments author:string body:text post_id:int
-refrakt gen resource products name:string price:float in_stock:bool
+mastro gen resource posts title:string body:text published:bool
+mastro gen resource comments author:string body:text post_id:int
+mastro gen resource products name:string price:float in_stock:bool
 
 # JSON API mode (no views/forms, routes under /api/)
-refrakt gen resource posts title:string body:text --api
+mastro gen resource posts title:string body:text --api
 ```
 
 **Creates (HTML mode):**
@@ -79,14 +79,14 @@ The generator singularizes it for types (`Post`) and file names
 
 ---
 
-### `refrakt gen page <name>`
+### `mastro gen page <name>`
 
 Generate a simple page handler.
 
 ```bash
-refrakt gen page about
-refrakt gen page contact
-refrakt gen page pricing
+mastro gen page about
+mastro gen page contact
+mastro gen page pricing
 ```
 
 **Creates:** Handler and test file.
@@ -94,12 +94,12 @@ refrakt gen page pricing
 
 ---
 
-### `refrakt gen auth`
+### `mastro gen auth`
 
 Generate a complete authentication system.
 
 ```bash
-refrakt gen auth
+mastro gen auth
 ```
 
 **Creates:** 9 files — user domain, user repo, auth handler, auth
@@ -111,13 +111,13 @@ See [Authentication](authentication.md) for details.
 
 ---
 
-### `refrakt gen island <name>`
+### `mastro gen island <name>`
 
 Generate a Lustre interactive island.
 
 ```bash
-refrakt gen island counter
-refrakt gen island search
+mastro gen island counter
+mastro gen island search
 ```
 
 **Creates:**
@@ -128,13 +128,13 @@ See [Lustre Integration](lustre-integration.md) for details.
 
 ---
 
-### `refrakt gen live <name>`
+### `mastro gen live <name>`
 
 Generate a Lustre server component with WebSocket transport.
 
 ```bash
-refrakt gen live dashboard
-refrakt gen live chat
+mastro gen live dashboard
+mastro gen live chat
 ```
 
 **Creates:**
@@ -149,25 +149,25 @@ browser over WebSocket. See [Lustre Integration](lustre-integration.md).
 
 ---
 
-### `refrakt gen migration <name>`
+### `mastro gen migration <name>`
 
 Generate an empty SQL migration file.
 
 ```bash
-refrakt gen migration add_email_to_posts
-refrakt gen migration create_comments
+mastro gen migration add_email_to_posts
+mastro gen migration create_comments
 ```
 
 **Creates:** Timestamped SQL file in `data/migrations/`.
 
 ---
 
-### `refrakt routes`
+### `mastro routes`
 
 Print the route table from `router.gleam`.
 
 ```bash
-refrakt routes
+mastro routes
 ```
 
 **Output:**
@@ -182,12 +182,12 @@ GET     /posts/:id          post_handler.show
 
 ---
 
-### `refrakt migrate`
+### `mastro migrate`
 
 Run pending database migrations.
 
 ```bash
-refrakt migrate
+mastro migrate
 ```
 
 On first run, generates a `src/<app>/migrate.gleam` module that
@@ -197,12 +197,12 @@ Requires a database (`--db postgres` or `--db sqlite`).
 
 ---
 
-### `refrakt build`
+### `mastro build`
 
 Compile Lustre islands to JavaScript.
 
 ```bash
-refrakt build
+mastro build
 ```
 
 Finds island modules in `web/islands/`, compiles them to JS, and
@@ -210,42 +210,42 @@ copies output to `priv/static/js/islands/`.
 
 ---
 
-### `refrakt dev`
+### `mastro dev`
 
 Start the dev server with file watching.
 
 ```bash
-refrakt dev
+mastro dev
 ```
 
 Sets `APP_ENV=dev` and runs `gleam run`. If `fswatch` is installed,
 watches `src/` for changes and auto-rebuilds + restarts.
 
 ```bash
-refrakt dev
+mastro dev
 ```
 
 Wraps `gleam run` with the dev environment variable set.
 
 ---
 
-### `refrakt help`
+### `mastro help`
 
 Show the help message with all commands.
 
 ```bash
-refrakt help
-refrakt --help
-refrakt -h
+mastro help
+mastro --help
+mastro -h
 ```
 
 ---
 
-### `refrakt version`
+### `mastro version`
 
 Print the version.
 
 ```bash
-refrakt version
-refrakt --version
+mastro version
+mastro --version
 ```

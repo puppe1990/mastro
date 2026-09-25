@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in Refrakt
+about: Report a bug in Mastro
 title: ''
 labels: bug
 ---
@@ -11,8 +11,8 @@ A clear description of the bug.
 
 ## Steps to reproduce
 
-1. `refrakt new my_app --db postgres`
-2. `refrakt gen resource ...`
+1. `mastro new my_app --db postgres`
+2. `mastro gen resource ...`
 3. `gleam build`
 4. See error
 
@@ -31,4 +31,4 @@ Paste the full error output here
 - Gleam version: `gleam --version`
 - Erlang/OTP version:
 - OS:
-- Refrakt version:
+- Mastro version:

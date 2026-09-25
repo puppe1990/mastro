@@ -1,6 +1,6 @@
 import gleam/list
 import gleam/result
-import refrakt/validate
+import mastro/validate
 import wisp
 
 pub type LoginParams {

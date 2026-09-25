@@ -1,6 +1,6 @@
 # Workflow
 
-Commands, processes, and common tasks for working on Refrakt.
+Commands, processes, and common tasks for working on Mastro.
 
 ---
 
@@ -71,15 +71,15 @@ gleam docs build --open
 ### Running CLI Commands Locally
 
 ```bash
-# Test `refrakt new`
-gleam run -m refrakt_cli -- new test_app
+# Test `mastro new`
+gleam run -m mastro_cli -- new test_app
 
-# Test `refrakt gen resource`
+# Test `mastro gen resource`
 cd test_app
-gleam run -m refrakt_cli -- gen resource posts title:string body:text published:bool
+gleam run -m mastro_cli -- gen resource posts title:string body:text published:bool
 
-# Test `refrakt gen page`
-gleam run -m refrakt_cli -- gen page about
+# Test `mastro gen page`
+gleam run -m mastro_cli -- gen page about
 ```
 
 ### Testing Generated Output
@@ -170,8 +170,8 @@ gleam test
 
 ```bash
 # Publish library first (CLI depends on it)
-cd packages/refrakt && gleam publish
-cd packages/refrakt_cli && gleam publish
+cd packages/mastro && gleam publish
+cd packages/mastro_cli && gleam publish
 ```
 
 ---

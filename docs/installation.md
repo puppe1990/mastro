@@ -20,31 +20,31 @@ mise use erlang@27
 mise use rebar@3
 ```
 
-## Install Refrakt
+## Install Mastro
 
-Refrakt is a Gleam package on Hex. Install the CLI by adding it to a
+Mastro is a Gleam package on Hex. Install the CLI by adding it to a
 global or project dependency:
 
 ```bash
-gleam add refrakt
+gleam add mastro
 ```
 
 Then run commands with:
 
 ```bash
-gleam run -m refrakt/cli -- <command>
+gleam run -m mastro/cli -- <command>
 ```
 
 Or create an alias in your shell:
 
 ```bash
-alias refrakt='gleam run -m refrakt/cli --'
+alias mastro='gleam run -m mastro/cli --'
 ```
 
 ## Create your first project
 
 ```bash
-refrakt new my_app
+mastro new my_app
 cd my_app
 gleam run
 ```
@@ -55,16 +55,16 @@ Visit http://localhost:4000 — you should see the welcome page.
 
 ```bash
 # PostgreSQL
-refrakt new my_app --db postgres
+mastro new my_app --db postgres
 
 # SQLite
-refrakt new my_app --db sqlite
+mastro new my_app --db sqlite
 ```
 
 ### Without a database
 
 ```bash
-refrakt new my_app
+mastro new my_app
 ```
 
 This is the default. You can add a database later by manually adding

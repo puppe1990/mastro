@@ -1,6 +1,6 @@
 # Forms & Validation
 
-Refrakt generates typed form decoders with validation for every
+Mastro generates typed form decoders with validation for every
 resource. Forms use two types: one for display state and one for
 validated input.
 
@@ -104,10 +104,10 @@ pub fn edit(req: Request, ctx: Context, id: String) -> Response {
 
 ## Validation helpers
 
-The `refrakt/validate` module provides composable validators:
+The `mastro/validate` module provides composable validators:
 
 ```gleam
-import refrakt/validate
+import mastro/validate
 
 let errors =
   []

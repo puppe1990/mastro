@@ -1,6 +1,6 @@
 # Testing
 
-Refrakt generates tests alongside every resource and auth system.
+Mastro generates tests alongside every resource and auth system.
 Tests run with Gleam's built-in test runner.
 
 ## Running tests
@@ -16,7 +16,7 @@ in `_test` in the `test/` directory.
 
 ### Resource tests
 
-`refrakt gen resource posts title:string body:text published:bool`
+`mastro gen resource posts title:string body:text published:bool`
 generates tests in `test/<app>/web/post_handler_test.gleam`:
 
 ```gleam
@@ -45,7 +45,7 @@ pub fn decode_missing_title_returns_error_test() {
 
 ### Auth tests
 
-`refrakt gen auth` generates password hashing tests:
+`mastro gen auth` generates password hashing tests:
 
 ```gleam
 pub fn hash_password_test() {
@@ -61,11 +61,11 @@ pub fn wrong_password_test() {
 
 ## Test helpers
 
-The `refrakt/testing` module provides request builders for testing
+The `mastro/testing` module provides request builders for testing
 handlers without a running server:
 
 ```gleam
-import refrakt/testing
+import mastro/testing
 
 // Build requests
 let req = testing.get("/posts")
@@ -134,7 +134,7 @@ pub fn password_roundtrip_test() {
 ### Testing validation helpers
 
 ```gleam
-import refrakt/validate
+import mastro/validate
 
 pub fn required_rejects_empty_test() {
   []

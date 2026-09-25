@@ -1,15 +1,15 @@
-# Refrakt
+# Mastro
 
 > **A convention-first web framework for Gleam. Productive like Phoenix, explicit like Gleam, composable with Wisp and Lustre.**
 
-Refrakt gives Gleam developers Phoenix-like coherence and Rails-like convention without macros, magic, or hidden runtime tricks. It is a CLI code generator that produces plain Gleam code, plus a small library of helpers for validation, flash messages, migrations, and testing.
+Mastro gives Gleam developers Phoenix-like coherence and Rails-like convention without macros, magic, or hidden runtime tricks. It is a CLI code generator that produces plain Gleam code, plus a small library of helpers for validation, flash messages, migrations, and testing.
 
 ## Philosophy
 
 1. **Conventions over assembly** — One obvious way to structure an app. Default project layout, naming rules, routing shape.
 2. **Generated code is your code** — The CLI produces plain Gleam files you own and modify. No "framework code" vs "your code" distinction.
-3. **No magic, no macros** — Gleam intentionally lacks metaprogramming. Refrakt respects that. Routing is pattern matching. Views are functions. Validation is functions.
-4. **Wisp + Lustre, not NIH** — Build on the ecosystem, don't replace it. Wisp handles HTTP. Lustre handles HTML. Refrakt adds the conventions and generators.
+3. **No magic, no macros** — Gleam intentionally lacks metaprogramming. Mastro respects that. Routing is pattern matching. Views are functions. Validation is functions.
+4. **Wisp + Lustre, not NIH** — Build on the ecosystem, don't replace it. Wisp handles HTTP. Lustre handles HTML. Mastro adds the conventions and generators.
 5. **Boring where boring is good** — CRUD, forms, validation, sessions, layouts. Get this right before chasing real-time cleverness.
 
 **Before adding anything, ask:**
@@ -20,31 +20,31 @@ Refrakt gives Gleam developers Phoenix-like coherence and Rails-like convention 
 ## Architecture
 
 ```
-refrakt (monorepo)
+mastro (monorepo)
 ├── packages/
-│   ├── refrakt/          ← Library: validation, flash, migrations, test helpers
-│   └── refrakt_cli/      ← CLI: code generators, project scaffolding
+│   ├── mastro/          ← Library: validation, flash, migrations, test helpers
+│   └── mastro_cli/      ← CLI: code generators, project scaffolding
 └── docs/                 ← Golden path, ADRs, tutorials
 ```
 
 ### Two Deliverables
 
-**`refrakt` (library)** — Published to Hex. Imported by generated projects. Contains:
+**`mastro` (library)** — Published to Hex. Imported by generated projects. Contains:
 - Validation helpers (required, min_length, max_length, format, etc.)
 - Flash message helpers (signed cookies)
 - Migration runner (SQL files, tracking table)
 - Test helpers (request builders)
 - Dev error page
 
-**`refrakt_cli` (CLI tool)** — Installed as a binary. Generates code. Contains:
-- `refrakt new` — scaffold a project
-- `refrakt gen page` — handler + route
-- `refrakt gen resource` — full CRUD (handler, views, form, domain type, repo, migration)
-- `refrakt gen auth` — starter auth system
-- `refrakt gen migration` — SQL migration file
-- `refrakt migrate` — run pending migrations
-- `refrakt dev` — dev server wrapper
-- `refrakt routes` — print route table
+**`mastro_cli` (CLI tool)** — Installed as a binary. Generates code. Contains:
+- `mastro new` — scaffold a project
+- `mastro gen page` — handler + route
+- `mastro gen resource` — full CRUD (handler, views, form, domain type, repo, migration)
+- `mastro gen auth` — starter auth system
+- `mastro gen migration` — SQL migration file
+- `mastro migrate` — run pending migrations
+- `mastro dev` — dev server wrapper
+- `mastro routes` — print route table
 
 ### Generated App Structure
 
@@ -137,8 +137,8 @@ gleam test
 gleam format --check
 
 # Run the CLI locally
-gleam run -m refrakt_cli -- new my_app
-gleam run -m refrakt_cli -- gen resource posts title:string body:text
+gleam run -m mastro_cli -- new my_app
+gleam run -m mastro_cli -- gen resource posts title:string body:text
 
 # Docs
 gleam docs build
@@ -148,11 +148,11 @@ gleam docs build
 
 | Path | Purpose |
 |------|---------|
-| `packages/refrakt/src/refrakt.gleam` | Library entry point |
-| `packages/refrakt/src/refrakt/validate.gleam` | Validation helpers |
-| `packages/refrakt/src/refrakt/flash.gleam` | Flash message helpers |
-| `packages/refrakt/src/refrakt/migrate.gleam` | Migration runner |
-| `packages/refrakt/src/refrakt/testing.gleam` | Test helpers |
-| `packages/refrakt_cli/src/refrakt_cli.gleam` | CLI entry point |
-| `packages/refrakt_cli/src/refrakt_cli/gen/` | Code generators |
+| `packages/mastro/src/mastro.gleam` | Library entry point |
+| `packages/mastro/src/mastro/validate.gleam` | Validation helpers |
+| `packages/mastro/src/mastro/flash.gleam` | Flash message helpers |
+| `packages/mastro/src/mastro/migrate.gleam` | Migration runner |
+| `packages/mastro/src/mastro/testing.gleam` | Test helpers |
+| `packages/mastro_cli/src/mastro_cli.gleam` | CLI entry point |
+| `packages/mastro_cli/src/mastro_cli/gen/` | Code generators |
 | `docs/GOLDEN_PATH.md` | Golden path specification |

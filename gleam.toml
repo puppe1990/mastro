@@ -1,9 +1,9 @@
-name = "refrakt"
+name = "mastro"
 version = "0.2.0"
 target = "erlang"
 description = "A convention-first web framework for Gleam"
 licences = ["MIT"]
-repository = { type = "github", user = "raskell-io", repo = "refrakt" }
+repository = { type = "github", user = "puppe1990", repo = "mastro" }
 gleam = ">= 1.14.0"
 
 [dependencies]
