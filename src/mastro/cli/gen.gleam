@@ -1,14 +1,31 @@
 /// Code generators: page, resource, migration, auth.
 ///
+import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/result
 import gleam/string
 import mastro/cli/format
 import mastro/cli/project
 import mastro/cli/templates
 import mastro/cli/types.{type DbChoice, NoDb, Postgres, Sqlite}
 import simplifile
+
+/// Flags that change what a generated resource ships.
+pub type ResourceOptions {
+  ResourceOptions(public: Bool, paginate: Bool, seed: Bool, admin_auth: String)
+}
+
+fn parse_resource_options(args: List(String)) -> ResourceOptions {
+  ResourceOptions(
+    public: list.contains(args, "--public"),
+    paginate: list.contains(args, "--paginate"),
+    seed: !list.contains(args, "--no-seed"),
+    admin_auth: extract_flag_value(args, "--admin-auth")
+      |> result.unwrap("session"),
+  )
+}
 
 // =============================================================================
 // gen page
@@ -72,17 +89,42 @@ pub fn resource(name: String, raw_args: List(String)) {
   let app = project.app_name()
   let db = project.detect_db()
   let api_mode = list.contains(raw_args, "--api")
+  let options = parse_resource_options(raw_args)
   let belongs_to = extract_flag_value(raw_args, "--belongs-to")
   let raw_fields = list.filter(raw_args, fn(a) { !string.starts_with(a, "--") })
   let singular = singularize(name)
   let type_name = capitalize(singular)
 
-  // Add foreign key field if --belongs-to is set
-  let extra_fields = case belongs_to {
-    Ok(parent) -> [#(singularize(parent) <> "_id", "int")]
-    Error(_) -> []
+  // `field:references` and `field:belongs_to` become `<field>_id` columns
+  // backed by a foreign key; `--belongs-to` is the older single-FK spelling.
+  let parsed = parse_fields(raw_fields)
+  let references =
+    parsed
+    |> list.filter_map(fn(f) {
+      case f.1 {
+        "references" | "belongs_to" -> Ok(singularize(f.0))
+        _ -> Error(Nil)
+      }
+    })
+    |> list.append(case belongs_to {
+      Ok(parent) -> [singularize(parent)]
+      Error(_) -> []
+    })
+
+  let scalar_fields =
+    parsed
+    |> list.filter(fn(f) { f.1 != "references" && f.1 != "belongs_to" })
+  let reference_fields =
+    references |> list.map(fn(parent) { #(parent <> "_id", "int") })
+  let fields = list.append(scalar_fields, reference_fields)
+
+  // Sortable columns: the scalar fields the index shows. The display field
+  // (search target) is the first one.
+  let sortable = list.map(scalar_fields, fn(f) { f.0 })
+  let display_field = case sortable {
+    [first, ..] -> first
+    [] -> "id"
   }
-  let fields = list.append(parse_fields(raw_fields), extra_fields)
 
   // Paths
   let handler_path = "src/" <> app <> "/web/" <> singular <> "_handler.gleam"
@@ -182,11 +224,23 @@ pub fn resource(name: String, raw_args: List(String)) {
   let assert Ok(_) =
     simplifile.write(
       repo_path,
-      resource_repo(app, singular, type_name, fields, db),
+      resource_repo(
+        app,
+        singular,
+        type_name,
+        fields,
+        db,
+        references,
+        sortable,
+        display_field,
+      ),
     )
 
   let assert Ok(_) =
-    simplifile.write(migration_path, resource_migration(name, fields, db))
+    simplifile.write(
+      migration_path,
+      resource_migration(name, fields, db, references),
+    )
 
   let assert Ok(_) =
     simplifile.write(test_path, case api_mode {
@@ -219,6 +273,31 @@ pub fn resource(name: String, raw_args: List(String)) {
   io.println("")
   io.println("Updated:")
   io.println("  " <> router_path)
+  io.println("")
+  io.println("Flags: " <> describe_options(options))
+  case references {
+    [] -> Nil
+    _ -> io.println("Foreign keys: " <> string.join(references, ", "))
+  }
+}
+
+fn describe_options(options: ResourceOptions) -> String {
+  let parts = [
+    case options.public {
+      True -> "public"
+      False -> "admin"
+    },
+    case options.paginate {
+      True -> "paginate"
+      False -> "no-paginate"
+    },
+    case options.seed {
+      True -> "seed"
+      False -> "no-seed"
+    },
+    "admin-auth=" <> options.admin_auth,
+  ]
+  string.join(parts, ", ")
 }
 
 // =============================================================================
@@ -714,15 +793,24 @@ fn api_resource_handler(
     False -> ""
   }
 
-  "import gleam/int" <> extra_imports <> "
+  "import gleam/dict" <> extra_imports <> "
+import gleam/int
 import gleam/json
+import gleam/result
 import " <> app_name <> "/context.{type Context}
 import " <> app_name <> "/data/" <> resource_singular <> "_repo
 import " <> app_name <> "/domain/" <> resource_singular <> "
+import mastro/query
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, ctx: Context) -> Response {
-  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ")
+pub fn index(req: Request, ctx: Context) -> Response {
+  let params = query.parse(req.query)
+  let q = dict.get(params, \"q\") |> result.unwrap(\"\")
+  let sort = dict.get(params, \"sort\") |> result.unwrap(\"\")
+  let dir = dict.get(params, \"dir\") |> result.unwrap(\"\")
+  let page = dict.get(params, \"page\") |> int.parse |> result.unwrap(1)
+
+  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ", q, sort, dir, page)
   let body =
     json.array(items, to_json)
     |> json.to_string
@@ -1107,12 +1195,31 @@ fn resource_repo(
   type_name: String,
   fields: List(#(String, String)),
   db: DbChoice,
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   case db {
     Sqlite | NoDb ->
-      resource_repo_sqlite(app_name, resource_singular, type_name, fields)
+      resource_repo_sqlite(
+        app_name,
+        resource_singular,
+        type_name,
+        fields,
+        references,
+        sortable,
+        display,
+      )
     Postgres ->
-      resource_repo_pog(app_name, resource_singular, type_name, fields)
+      resource_repo_pog(
+        app_name,
+        resource_singular,
+        type_name,
+        fields,
+        references,
+        sortable,
+        display,
+      )
   }
 }
 
@@ -1121,11 +1228,16 @@ fn resource_repo_sqlite(
   resource_singular: String,
   type_name: String,
   fields: List(#(String, String)),
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   let table = resource_singular <> "s"
   let field_names = list.map(fields, fn(f) { f.0 }) |> string.join(", ")
   let select_fields = "id, " <> field_names
   let q = "\""
+  let sortable_literal = string_list_literal(sortable)
+  let options_fns = reference_option_fns(references)
 
   let decoder_fields =
     fields
@@ -1197,6 +1309,7 @@ fn resource_repo_sqlite(
         <> type_name
         <> "Params}",
       "import " <> app_name <> "/data/repo",
+      "import mastro/query",
       "import sqlight",
       "",
       "fn "
@@ -1213,22 +1326,48 @@ fn resource_repo_sqlite(
         <> "))",
       "}",
       "",
-      "pub fn list(db_path: String) -> List(" <> type_name <> ") {",
-      "  case repo.query(db_path, "
+      "/// Search (LIKE on " <> display <> "), a whitelisted sort and a page.",
+      "pub fn list(",
+      "  db_path: String,",
+      "  search: String,",
+      "  sort: String,",
+      "  dir: String,",
+      "  page: Int,",
+      ") -> List(" <> type_name <> ") {",
+      "  let order = query.order_by(sort, dir, "
+        <> sortable_literal
+        <> ", \"id\")",
+      "  let offset = query.offset(page, query.per_page)",
+      "  case repo.query(",
+      "    db_path,",
+      "    "
         <> q
         <> "SELECT "
         <> select_fields
         <> " FROM "
         <> table
-        <> " ORDER BY id DESC"
+        <> " WHERE "
+        <> display
+        <> " LIKE ? "
         <> q
-        <> ", [], "
-        <> resource_singular
-        <> "_decoder()) {",
+        <> " <> order <> "
+        <> q
+        <> " LIMIT ? OFFSET ?"
+        <> q
+        <> ",",
+      "    [",
+      "      sqlight.text(query.like_pattern(search)),",
+      "      sqlight.int(query.per_page),",
+      "      sqlight.int(offset),",
+      "    ],",
+      "    " <> resource_singular <> "_decoder(),",
+      "  ) {",
       "    Ok(rows) -> rows",
       "    Error(_) -> []",
       "  }",
       "}",
+      "",
+      options_fns,
       "",
       "pub fn get(db_path: String, id: Int) -> Result("
         <> type_name
@@ -1340,6 +1479,9 @@ fn resource_repo_pog(
   resource_singular: String,
   type_name: String,
   fields: List(#(String, String)),
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   let field_names =
     fields
@@ -1347,6 +1489,8 @@ fn resource_repo_pog(
     |> string.join(", ")
 
   let select_fields = "id, " <> field_names
+  let sortable_literal = string_list_literal(sortable)
+  let options_fns = reference_option_fns_pog(references)
 
   let decoder_fields =
     fields
@@ -1401,17 +1545,6 @@ fn resource_repo_pog(
 
   let q = "\""
   let table = resource_singular <> "s"
-
-  let list_query =
-    "  pog.query("
-    <> q
-    <> "SELECT "
-    <> select_fields
-    <> " FROM "
-    <> table
-    <> " ORDER BY id DESC"
-    <> q
-    <> ")"
 
   let get_query =
     "  pog.query("
@@ -1491,6 +1624,7 @@ fn resource_repo_pog(
         <> "_form.{type "
         <> type_name
         <> "Params}",
+      "import mastro/query",
       "import pog",
       "",
       "fn "
@@ -1507,13 +1641,43 @@ fn resource_repo_pog(
         <> "))",
       "}",
       "",
-      "pub fn list(db: pog.Connection) -> List(" <> type_name <> ") {",
-      list_query,
+      "/// Search (LIKE on " <> display <> "), a whitelisted sort and a page.",
+      "pub fn list(",
+      "  db: pog.Connection,",
+      "  search: String,",
+      "  sort: String,",
+      "  dir: String,",
+      "  page: Int,",
+      ") -> List(" <> type_name <> ") {",
+      "  let order = query.order_by(sort, dir, "
+        <> sortable_literal
+        <> ", \"id\")",
+      "  let pattern = query.like_pattern(search)",
+      "  pog.query("
+        <> q
+        <> "SELECT "
+        <> select_fields
+        <> " FROM "
+        <> resource_singular
+        <> "s WHERE "
+        <> display
+        <> " LIKE $1 "
+        <> q
+        <> " <> order <> "
+        <> q
+        <> " LIMIT $2 OFFSET $3"
+        <> q
+        <> ")",
+      "  |> pog.parameter(pog.text(pattern))",
+      "  |> pog.parameter(pog.int(query.per_page))",
+      "  |> pog.parameter(pog.int(query.offset(page, query.per_page)))",
       "  |> pog.returning(" <> resource_singular <> "_decoder())",
       "  |> pog.execute(db)",
       "  |> result.map(fn(r) { r.rows })",
       "  |> result.unwrap([])",
       "}",
+      "",
+      options_fns,
       "",
       "pub fn get(db: pog.Connection, id: Int) -> Result("
         <> type_name
@@ -1560,20 +1724,115 @@ fn resource_repo_pog(
   )
 }
 
+fn string_list_literal(items: List(String)) -> String {
+  "["
+  <> string.join(list.map(items, fn(item) { "\"" <> item <> "\"" }), ", ")
+  <> "]"
+}
+
+/// One `<parent>_options` function per foreign key, plus the shared decoder.
+fn reference_option_fns(references: List(String)) -> String {
+  case references {
+    [] -> ""
+    _ ->
+      references
+      |> list.map(fn(parent) {
+        "pub fn "
+        <> parent
+        <> "_options(db_path: String) -> List(#(Int, String)) {
+  case repo.query(
+    db_path,
+    \"SELECT id, COALESCE(name, title, CAST(id AS TEXT)) FROM "
+        <> parent
+        <> "s\",
+    [],
+    option_decoder(),
+  ) {
+    Ok(rows) -> rows
+    Error(_) -> []
+  }
+}
+
+"
+      })
+      |> string.join("")
+      |> fn(functions) {
+        functions <> "fn option_decoder() -> decode.Decoder(#(Int, String)) {
+  use id <- decode.field(0, decode.int)
+  use label <- decode.field(1, decode.string)
+  decode.success(#(id, label))
+}
+
+"
+      }
+  }
+}
+
+/// The Postgres spelling of the option functions.
+fn reference_option_fns_pog(references: List(String)) -> String {
+  case references {
+    [] -> ""
+    _ ->
+      references
+      |> list.map(fn(parent) {
+        "pub fn "
+        <> parent
+        <> "_options(db: pog.Connection) -> List(#(Int, String)) {
+  pog.query(\"SELECT id, COALESCE(name, title, id::text) FROM "
+        <> parent
+        <> "s\")
+  |> pog.returning(option_decoder())
+  |> pog.execute(db)
+  |> result.map(fn(r) { r.rows })
+  |> result.unwrap([])
+}
+
+"
+      })
+      |> string.join("")
+      |> fn(functions) {
+        functions <> "fn option_decoder() -> decode.Decoder(#(Int, String)) {
+  use id <- decode.field(0, decode.int)
+  use label <- decode.field(1, decode.string)
+  decode.success(#(id, label))
+}
+
+"
+      }
+  }
+}
+
 fn resource_migration(
   name: String,
   fields: List(#(String, String)),
   db: DbChoice,
+  references: List(String),
 ) -> String {
+  let reference_tables =
+    dict.from_list(
+      references
+      |> list.map(fn(parent) { #(parent <> "_id", parent <> "s") }),
+    )
+
   let column_defs =
     fields
     |> list.map(fn(f) {
       let #(field_name, field_type) = f
-      let sql_type = case db {
-        Sqlite -> to_sql_type_sqlite(field_type)
-        _ -> to_sql_type(field_type)
+      case dict.get(reference_tables, field_name) {
+        Ok(parent_table) ->
+          "  "
+          <> field_name
+          <> " INTEGER NOT NULL REFERENCES "
+          <> parent_table
+          <> "(id)"
+        Error(_) -> {
+          let sql_type = case db {
+            Sqlite -> to_sql_type_sqlite(field_type)
+            _ -> to_sql_type(field_type)
+          }
+          "  " <> field_name <> " " <> sql_type <> " NOT NULL"
+        }
       }
-      "  " <> field_name <> " " <> sql_type <> " NOT NULL"
     })
     |> string.join(",\n")
 

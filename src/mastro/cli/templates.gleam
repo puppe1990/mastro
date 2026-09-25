@@ -720,8 +720,10 @@ pub fn resource_handler(
     Sqlite -> "ctx.db_path"
     _ -> "ctx.db"
   }
-  "import gleam/int
+  "import gleam/dict
+import gleam/int
 import gleam/option
+import gleam/result
 import " <> app_name <> "/context.{type Context}
 import " <> app_name <> "/data/" <> resource_singular <> "_repo
 import " <> app_name <> "/web/error_handler
@@ -730,10 +732,17 @@ import " <> app_name <> "/web/layouts/root_layout
 import " <> app_name <> "/web/" <> resource_singular <> "_views
 import mastro/csrf
 import mastro/flash
+import mastro/query
 import wisp.{type Request, type Response}
 
 pub fn index(req: Request, ctx: Context) -> Response {
-  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ")
+  let params = query.parse(req.query)
+  let q = dict.get(params, \"q\") |> result.unwrap(\"\")
+  let sort = dict.get(params, \"sort\") |> result.unwrap(\"\")
+  let dir = dict.get(params, \"dir\") |> result.unwrap(\"\")
+  let page = dict.get(params, \"page\") |> int.parse |> result.unwrap(1)
+
+  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ", q, sort, dir, page)
   " <> resource_singular <> "_views.index_view(items)
   |> root_layout.wrap(\"" <> type_name <> "s\", req)
   |> wisp.html_response(200)
