@@ -173,6 +173,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] Dev logs (`/logs`, JSON request/SQL lines, boot banner with LAN URLs)
 - [x] `mastro doctor [--mobile]` checks (layout, amarra.js, PWA, CSP, chat, health)
 - [x] PWA assets (`mastro pwa`), manifest, service worker and `GET /health` with LAN URLs
+- [x] i18n (`LOCALE` + `t`) and Open Graph / Twitter metadata from `APP_URL`
 - [x] Dev file watcher (auto-rebuild on `src/` changes via fswatch)
 - [x] Auto-format all generated code
 - [x] Route table printer
@@ -222,6 +223,8 @@ See [`examples/tasks_app/`](examples/tasks_app/) for the complete app.
 | [Database](docs/database.md) | Postgres, SQLite, repos, migrations |
 | [Authentication](docs/authentication.md) | Sessions, middleware, customization |
 | [Dev logs](docs/dev-logs.md) | Request/SQL logging, `/logs`, boot banner |
+| [PWA & mobile](docs/pwa.md) | `mastro pwa`, manifest, service worker, `/health` |
+| [i18n & metadata](docs/i18n.md) | `LOCALE`, `t`, Open Graph / Twitter tags |
 | [Testing](docs/testing.md) | Generated tests, test helpers |
 | [Deployment](docs/deployment.md) | Production builds, Docker, Fly.io |
 | [CLI Reference](docs/cli.md) | All commands with flags and examples |
