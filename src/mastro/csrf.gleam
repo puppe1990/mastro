@@ -10,7 +10,8 @@
 //// and the cookie always carry the same value.
 ////
 //// `require` guards every mutating handler, with the form body the
-//// handler already parsed.
+//// handler already parsed. Handlers that have no use for the body call
+//// `require_request` instead.
 ////
 //// ```gleam
 //// fn middleware(req, next) {
@@ -21,6 +22,11 @@
 //// pub fn create(req, ctx) {
 ////   use form <- wisp.require_form(req)
 ////   use <- csrf.require(req, Some(form))
+////   // ...
+//// }
+////
+//// pub fn delete(req, ctx, id) {
+////   use <- csrf.require_request(req)
 ////   // ...
 //// }
 //// ```
@@ -164,6 +170,15 @@ pub fn require(
   }
 }
 
+/// Guard a handler that has no use for the body: the token comes from the
+/// header, or from the form when the request is a form post.
+pub fn require_request(req: Request, next: fn() -> Response) -> Response {
+  case is_form_post(req) {
+    True -> wisp.require_form(req, fn(form) { require(req, Some(form), next) })
+    False -> require(req, None, next)
+  }
+}
+
 /// The `403` response an invalid request receives.
 pub fn forbidden() -> Response {
   wisp.html_response("<h1>403 Forbidden</h1>", 403)
@@ -213,4 +228,13 @@ fn matches(expected: String, submitted: String) -> Bool {
     bit_array.from_string(expected),
     bit_array.from_string(submitted),
   )
+}
+
+fn is_form_post(req: Request) -> Bool {
+  case request.get_header(req, "content-type") {
+    Ok(content_type) ->
+      string.starts_with(content_type, "application/x-www-form-urlencoded")
+      || string.starts_with(content_type, "multipart/form-data")
+    Error(_) -> False
+  }
 }

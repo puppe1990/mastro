@@ -126,6 +126,42 @@ pub fn drive_request_with_the_header_passes_test() {
 
 // -- Middleware ---------------------------------------------------------------
 
+pub fn require_request_accepts_a_form_post_with_the_field_test() {
+  let #(get_request, get_response, token) = landing()
+
+  let request =
+    simulate.browser_request(http.Delete, "/posts/1")
+    |> simulate.session(get_request, get_response)
+    |> simulate.form_body([#(csrf.field_name, token)])
+
+  let resp = csrf.require_request(request, fn() { wisp.redirect("/posts") })
+  should.equal(resp.status, 303)
+}
+
+pub fn require_request_accepts_a_header_only_request_test() {
+  let #(get_request, get_response, token) = landing()
+
+  let request =
+    simulate.browser_request(http.Delete, "/posts/1")
+    |> simulate.session(get_request, get_response)
+    |> simulate.header(csrf.header_name, token)
+
+  let resp = csrf.require_request(request, fn() { wisp.redirect("/posts") })
+  should.equal(resp.status, 303)
+}
+
+pub fn require_request_rejects_a_form_post_without_the_field_test() {
+  let #(get_request, get_response, _token) = landing()
+
+  let request =
+    simulate.browser_request(http.Delete, "/posts/1")
+    |> simulate.session(get_request, get_response)
+    |> simulate.form_body([#("title", "No token here")])
+
+  let resp = csrf.require_request(request, must_not_run)
+  should.equal(resp.status, 403)
+}
+
 pub fn issue_threads_one_token_per_request_test() {
   let get_request = simulate.browser_request(http.Get, "/")
   let get_response =
