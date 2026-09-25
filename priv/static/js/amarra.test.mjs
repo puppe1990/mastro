@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { frameTarget, shouldIntercept } from "./amarra.js";
+import { csrfToken, frameTarget, shouldIntercept } from "./amarra.js";
 
 const ORIGIN = "https://app.test";
 
@@ -11,6 +11,17 @@ function fakeAnchor(overrides = {}) {
     hasAttribute: () => false,
     closest: () => null,
     ...overrides,
+  };
+}
+
+function fakeDocument(content) {
+  return {
+    querySelector: (selector) =>
+      selector === 'meta[name="csrf-token"]'
+        ? {
+            getAttribute: (name) => (name === "content" ? content : null),
+          }
+        : null,
   };
 }
 
@@ -52,4 +63,13 @@ test("frameTarget reads the data-amarra-frame attribute", () => {
   });
   assert.equal(frameTarget(anchor), "cart");
   assert.equal(frameTarget(fakeAnchor()), null);
+});
+
+test("csrfToken reads the csrf-token meta tag", () => {
+  assert.equal(csrfToken(fakeDocument("tok-123")), "tok-123");
+});
+
+test("csrfToken is empty when the page has no meta tag", () => {
+  assert.equal(csrfToken(fakeDocument(null)), "");
+  assert.equal(csrfToken({}), "");
 });
