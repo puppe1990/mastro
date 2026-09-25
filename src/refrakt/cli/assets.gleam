@@ -11,7 +11,7 @@ import simplifile
 fn run_cmd(cmd: String) -> String
 
 pub fn setup() {
-  let app = project.app_name()
+  let _app = project.app_name()
 
   io.println("Setting up asset pipeline...")
   io.println("")
