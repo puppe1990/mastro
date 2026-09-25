@@ -46,7 +46,7 @@ pub fn start(max_concurrency max: Int) -> Result(JobRunner, actor.StartError) {
   actor.new(State(running: 0, max: max))
   |> actor.on_message(handle_message)
   |> actor.start
-  |> result.map(fn(started) { started.subject })
+  |> result.map(fn(started) { started.data })
 }
 
 /// Enqueue a job for background execution.
@@ -60,9 +60,9 @@ pub fn enqueue_named(runner: JobRunner, name: String, work: fn() -> Nil) {
 }
 
 fn handle_message(
-  msg: JobMessage,
   state: State,
-) -> actor.Next(JobMessage, State) {
+  msg: JobMessage,
+) -> actor.Next(State, JobMessage) {
   case msg {
     Enqueue(name:, work:) -> {
       // Spawn the work in a new process

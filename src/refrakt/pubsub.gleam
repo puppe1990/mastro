@@ -47,7 +47,7 @@ pub fn start() -> Result(PubSub(msg), actor.StartError) {
   actor.new(State(topics: dict.new()))
   |> actor.on_message(handle_message)
   |> actor.start
-  |> result.map(fn(started) { started.subject })
+  |> result.map(fn(started) { started.data })
 }
 
 /// Subscribe a subject to a topic.
@@ -66,9 +66,9 @@ pub fn broadcast(ps: PubSub(msg), topic: String, message: msg) {
 }
 
 fn handle_message(
-  msg: PubSubMessage(msg),
   state: State(msg),
-) -> actor.Next(PubSubMessage(msg), State(msg)) {
+  msg: PubSubMessage(msg),
+) -> actor.Next(State(msg), PubSubMessage(msg)) {
   case msg {
     Subscribe(topic:, subscriber:) -> {
       let subs = case dict.get(state.topics, topic) {
