@@ -1,5 +1,6 @@
 import gleam/dict
 import gleam/list
+import gleam/string
 import gleeunit/should
 import mastro/doctor
 
@@ -21,7 +22,7 @@ fn healthy() -> dict.Dict(String, String) {
     ),
     #("src/app/router.gleam", "import mastro/jobs_ui"),
     #("src/app/web/health_handler.gleam", "lan_urls"),
-    #("src/app/web/chat_views.gleam", "chat-messages"),
+    #("src/app/web/chat_views.gleam", "chat-history"),
   ])
 }
 
@@ -141,4 +142,12 @@ pub fn mobile_flash_outside_main_fails_test() {
     |> mutate("src/app/web/layouts/root_layout.gleam", "flash.render()")
 
   check(doctor.run(files, True), "flash").level |> should.equal(doctor.Fail)
+}
+
+pub fn mobile_chat_check_points_at_the_chat_helper_test() {
+  let files = healthy() |> remove("src/app/web/chat_views.gleam")
+  let found = check(doctor.run(files, True), "chat")
+
+  found.level |> should.equal(doctor.Warn)
+  found.message |> string.contains("mastro/chat.history()") |> should.be_true
 }

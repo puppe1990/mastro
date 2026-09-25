@@ -67,4 +67,4 @@ in `ctx.config.port`, so `/health` always names the URL that answers.
 Point a phone at one of the `lan_urls` to test on-device, then run
 `mastro doctor --mobile` to check the mobile-specific guards (flash inside
 `#amarra-main`, no blocked font origins, network-first `amarra.js`, the
-`#chat-messages` container).
+`#chat-history` Stream container).
