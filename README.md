@@ -136,12 +136,17 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 | `mastro gen island <name>` | Lustre interactive island (client-side) |
 | `mastro gen live <name>` | Lustre server component (real-time over WebSocket) |
 | `mastro gen migration <name>` | SQL migration file |
+| `mastro gen component <stem> --list` | Seed / list kit component overrides |
+| `mastro destroy <kind> <name>` | Remove generated files and patches |
 | `mastro migrate` | Run pending migrations |
 | `mastro build` | Compile Lustre islands to JavaScript |
 | `mastro pwa [--bump] [--force]` | Install PWA assets (manifest, sw.js, icons) |
 | `mastro dev` | Dev server with file watching (auto-rebuild) |
 | `mastro doctor [--mobile]` | Check the app against the Amarra contract |
-| `mastro routes` | Print the route table |
+| `mastro console` | REPL over the app (history, `!N`, `!!`) |
+| `mastro link [path]` | Point `gleam.toml` at a local framework |
+| `mastro upgrade [version]` | Bump the framework and run doctor |
+| `mastro routes` | Print the route table (`--verbose` for middleware) |
 
 <br>
 
@@ -174,6 +179,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] `mastro doctor [--mobile]` checks (layout, amarra.js, PWA, CSP, chat, health)
 - [x] PWA assets (`mastro pwa`), manifest, service worker and `GET /health` with LAN URLs
 - [x] i18n (`LOCALE` + `t`) and Open Graph / Twitter metadata from `APP_URL`
+- [x] CLI parity: `gen component`, `destroy`, `link`, `upgrade`, `console`, `routes --verbose`
 - [x] Dev file watcher (auto-rebuild on `src/` changes via fswatch)
 - [x] Auto-format all generated code
 - [x] Route table printer

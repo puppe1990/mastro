@@ -162,12 +162,54 @@ mastro gen migration create_comments
 
 ---
 
-### `mastro routes`
+### `mastro gen component <stem> [--list] [--dry-run]`
+
+Seed an app-owned override for a shipped kit component, so the app restyles
+the real contract instead of recreating it. In the Lustre view layer an
+override is a module registered with `view.with_component` (ADR 0001).
+
+```bash
+mastro gen component --list          # print the overridable stems
+mastro gen component locale-toggle   # seed web/components/locale_toggle.gleam
+mastro gen component card --dry-run  # print the path, write nothing
+```
+
+**Creates:** `src/<app>/web/components/<stem>.gleam` with the
+`(attrs, inner) -> Element` shape.
+
+---
+
+### `mastro destroy <kind> <name> [--dry-run]`
+
+Remove generated files and undo the router patches.
+
+```bash
+mastro destroy resource posts
+mastro destroy handler about
+mastro destroy model post
+mastro destroy migration add_email_to_posts
+mastro destroy auth
+mastro destroy resource posts --dry-run
+```
+
+- `resource` removes the handler/views/form/domain/repo/test and its
+  `create_` migration, and unroutes it.
+- `handler` removes the handler and its test.
+- `model` removes the domain type and repo.
+- `migration` deletes `*_<name>.sql` only — it never touches the
+  `schema_migrations` ledger.
+- `auth` removes the auth modules and unroutes them.
+- `--dry-run` prints every change without writing.
+
+---
+
+### `mastro routes [--verbose]`
 
 Print the route table from `router.gleam`.
 
 ```bash
 mastro routes
+mastro routes --verbose
 ```
 
 **Output:**
@@ -178,6 +220,14 @@ GET     /posts              post_handler.index
 GET     /posts/new          post_handler.new
 POST    /posts              post_handler.create
 GET     /posts/:id          post_handler.show
+```
+
+`--verbose` adds the middleware stack and a static warning when two routes
+can match the same method and path shape:
+
+```
+Middleware: method_override -> dev_log.request_log -> dev_error.rescue -> security.headers -> serve_static -> csrf.issue
+warning: GET /posts/new may shadow GET /posts/:id
 ```
 
 ---
@@ -310,6 +360,58 @@ mastro doctor
   ...
   1 failed, 3 warning(s)
 ```
+
+---
+
+### `mastro console`
+
+Open a REPL over the project.
+
+```bash
+mastro console
+```
+
+```
+mastro> SELECT count(*) FROM users
+mastro> history
+  1  SELECT count(*) FROM users
+mastro> !1
+mastro> exit
+```
+
+Commands: `help`, `history`, `!N` (re-run entry N), `!!` (re-run the last
+command), `exit`/`quit`. The `store`, `cfg` and `db` bindings are in scope.
+The line handling lives in `mastro/console` and is pure, so it is tested
+without a terminal.
+
+---
+
+### `mastro link [path] [--unlink]`
+
+Point `gleam.toml` at a local checkout of the framework for development.
+
+```bash
+mastro link ../mastro
+mastro link --unlink
+```
+
+Writes `mastro = { path = "../mastro" }`. This is local-only — do not
+commit it; `--unlink` restores the published version constraint.
+
+---
+
+### `mastro upgrade [version] [--dry-run]`
+
+Bump the mastro constraint, print the migration steps, and run
+`mastro doctor`.
+
+```bash
+mastro upgrade
+mastro upgrade 0.3.0
+mastro upgrade --dry-run
+```
+
+`--dry-run` reports the change and the steps without writing.
 
 ---
 
