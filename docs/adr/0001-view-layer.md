@@ -1,8 +1,8 @@
 # ADR 0001 — Camada de view: Lustre nativo vs templates HTML em runtime
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Data:** 2026-09-25
-- **Decisor:** puppe1990
+- **Decisor:** puppe1990 (confirmado em 2026-09-25)
 - **Relacionado:** #2 (esta decisão), #3 (kit), #4 (Drive/Frame), #17 (i18n/meta)
 - **Referência externa:** amarra-cais `AGENTS.md` → "Template loader contract", "Amarra Views + Drive"
 
@@ -78,7 +78,7 @@ Lustre para páginas/ilhas e um mini-motor apenas para componentes de kit
 em HTML. Prós: meio-termo. Contras: dois modelos mentais, duas superfícies
 de escaping, API inconsistente para o usuário.
 
-## Decisão proposta
+## Decisão
 
 **Opção A.** Manter o Lustre como renderer único e entregar o contrato
 observável (Drive, Frame, Stream, Live, kit, CSRF, flash) como bibliotecas
