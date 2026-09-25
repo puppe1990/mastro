@@ -3,11 +3,20 @@
 /// These tests run generators in a temp directory and verify the output
 /// files exist and contain expected content.
 ///
+import gleam/dict
 import gleam/list
+import gleam/result
 import gleam/string
 import gleeunit/should
+import mastro/cli/component
+import mastro/cli/destroy
 import mastro/cli/gen
+import mastro/cli/jobs_cmd
+import mastro/cli/migrate_cmd
 import mastro/cli/new
+import mastro/cli/pwa
+import mastro/cli/types
+import mastro/doctor
 import simplifile
 
 // =============================================================================
@@ -28,6 +37,10 @@ fn file_exists(path: String) -> Bool {
     Ok(_) -> True
     Error(_) -> False
   }
+}
+
+fn path_exists(path: String) -> Bool {
+  simplifile.is_file(path) |> result.unwrap(False)
 }
 
 fn file_contains(path: String, substring: String) -> Bool {
@@ -101,9 +114,271 @@ pub fn new_extracts_name_from_path_test() {
   })
 }
 
+pub fn new_app_wires_dev_logs_and_the_banner_test() {
+  in_temp_dir("new_logs", fn(dir) {
+    let project_dir = dir <> "/logs_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    file_contains(project_dir <> "/src/logs_app.gleam", "dev_log.install(logs)")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app.gleam",
+      "net.pick_port(cfg.port",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app.gleam",
+      "net.banner(\"logs_app\"",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/context.gleam",
+      "logs: dev_log.Store",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/config.gleam",
+      "log_format: LogFormat",
+    )
+    |> should.be_true
+
+    file_contains(project_dir <> "/src/logs_app/router.gleam", "dev_log.viewer")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/logs_app/router.gleam",
+      "dev_log.request_log",
+    )
+    |> should.be_true
+  })
+}
+
+// =============================================================================
+// health and PWA
+// =============================================================================
+
+pub fn new_app_serves_health_with_lan_urls_test() {
+  in_temp_dir("health", fn(dir) {
+    let project_dir = dir <> "/health_app"
+    new.run(project_dir, [])
+
+    file_exists(project_dir <> "/src/health_app/web/health_handler.gleam")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/web/health_handler.gleam",
+      "health.respond",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/router.gleam",
+      "health_handler.index",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/web/layouts/root_layout.gleam",
+      "amarra-main",
+    )
+    |> should.be_true
+  })
+}
+
+pub fn new_app_has_i18n_and_meta_test() {
+  in_temp_dir("meta", fn(dir) {
+    let project_dir = dir <> "/meta_app"
+    new.run(project_dir, [])
+
+    file_contains(
+      project_dir <> "/src/meta_app/config.gleam",
+      "locale: i18n.Locale",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/config.gleam",
+      "pub const app_name",
+    )
+    |> should.be_true
+    file_contains(project_dir <> "/src/meta_app/config.gleam", "meta.site_from")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/web/layouts/root_layout.gleam",
+      "meta.head_elements",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/meta_app/web/home_handler.gleam",
+      "config.site",
+    )
+    |> should.be_true
+  })
+}
+
+pub fn pwa_installs_assets_and_bump_increments_test() {
+  in_temp_dir("pwa", fn(dir) {
+    let project_dir = dir <> "/pwa_app"
+    new.run(project_dir, [])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    pwa.run([])
+
+    file_exists("priv/static/js/amarra.js") |> should.be_true
+    file_exists("priv/static/manifest.webmanifest") |> should.be_true
+    path_exists("priv/static/icons/icon-512.png") |> should.be_true
+    path_exists("priv/static/icons/icon-512-maskable.png") |> should.be_true
+    path_exists("priv/static/og.png") |> should.be_true
+    file_contains("priv/static/js/sw.js", "CACHE_VERSION = 1") |> should.be_true
+
+    pwa.run(["--bump"])
+    file_contains("priv/static/js/sw.js", "CACHE_VERSION = 2") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+// =============================================================================
+// destroy and gen component
+// =============================================================================
+
+pub fn gen_component_seeds_an_override_test() {
+  in_temp_dir("component", fn(dir) {
+    let project_dir = dir <> "/comp_app"
+    new.run(project_dir, [])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    component.run("locale-toggle", [])
+
+    file_exists("src/comp_app/web/components/locale_toggle.gleam")
+    |> should.be_true
+    file_contains(
+      "src/comp_app/web/components/locale_toggle.gleam",
+      "pub fn render(",
+    )
+    |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn destroy_resource_removes_files_and_routes_test() {
+  in_temp_dir("destroy", fn(dir) {
+    let project_dir = dir <> "/dest_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+    file_exists("src/dest_app/web/post_handler.gleam") |> should.be_true
+
+    destroy.run("resource", "posts", [])
+
+    file_exists("src/dest_app/web/post_handler.gleam") |> should.be_false
+    file_exists("src/dest_app/data/post_repo.gleam") |> should.be_false
+    file_contains("src/dest_app/router.gleam", "post_handler")
+    |> should.be_false
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn destroy_dry_run_writes_nothing_test() {
+  in_temp_dir("destroy_dry", fn(dir) {
+    let project_dir = dir <> "/dry_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+    let assert Ok(before) = simplifile.read("src/dry_app/router.gleam")
+
+    destroy.run("resource", "posts", ["--dry-run"])
+
+    file_exists("src/dry_app/web/post_handler.gleam") |> should.be_true
+    let assert Ok(after) = simplifile.read("src/dry_app/router.gleam")
+    after |> should.equal(before)
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+// =============================================================================
+// doctor
+// =============================================================================
+
+pub fn doctor_fails_on_a_fresh_sqlite_app_without_amarra_js_test() {
+  in_temp_dir("doctor", fn(dir) {
+    let project_dir = dir <> "/doc_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    let files =
+      dict.from_list([
+        #("gleam.toml", simplifile.read("gleam.toml") |> result.unwrap("")),
+        #(
+          "src/doc_app/web/layouts/root_layout.gleam",
+          simplifile.read("src/doc_app/web/layouts/root_layout.gleam")
+            |> result.unwrap(""),
+        ),
+      ])
+
+    let report = doctor.run(files, False)
+    doctor.has_failures(report) |> should.be_true
+
+    let assert Ok(amarra) =
+      list.find(report.checks, fn(check) { check.name == "amarra.js" })
+    amarra.level |> should.equal(doctor.Fail)
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
 // =============================================================================
 // gen resource (runs inside a generated project)
 // =============================================================================
+
+pub fn resource_reference_adds_foreign_key_and_options_test() {
+  in_temp_dir("resource_fk", fn(dir) {
+    let project_dir = dir <> "/fk_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string", "author:references"])
+
+    file_contains(
+      "src/fk_app/data/migrations/001_create_posts.sql",
+      "author_id INTEGER NOT NULL REFERENCES authors(id)",
+    )
+    |> should.be_true
+    file_contains("src/fk_app/domain/post.gleam", "author_id: Int")
+    |> should.be_true
+    file_contains("src/fk_app/data/post_repo.gleam", "pub fn author_options(")
+    |> should.be_true
+    file_contains("src/fk_app/data/post_repo.gleam", "query.order_by(sort, dir")
+    |> should.be_true
+    file_contains(
+      "src/fk_app/data/post_repo.gleam",
+      "query.like_pattern(search)",
+    )
+    |> should.be_true
+    file_contains("src/fk_app/web/post_handler.gleam", "query.parse(req.query)")
+    |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
 
 pub fn gen_resource_creates_all_files_test() {
   in_temp_dir("gen_resource", fn(dir) {
@@ -265,6 +540,121 @@ pub fn gen_island_creates_files_test() {
       "pub fn render()",
     )
     |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+// =============================================================================
+// migrations and the database module
+// =============================================================================
+
+pub fn gen_migration_writes_up_and_down_sections_test() {
+  in_temp_dir("gen_migration", fn(dir) {
+    let project_dir = dir <> "/mig_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.migration("add_email")
+
+    let path = "src/mig_app/data/migrations/001_add_email.sql"
+    file_contains(path, "-- up") |> should.be_true
+    file_contains(path, "-- down") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn resource_migration_carries_its_own_rollback_test() {
+  in_temp_dir("resource_down", fn(dir) {
+    let project_dir = dir <> "/roll_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+
+    let path = "src/roll_app/data/migrations/001_create_posts.sql"
+    file_contains(path, "-- up") |> should.be_true
+    file_contains(path, "DROP TABLE posts;") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn sqlite_resource_repo_routes_through_the_logging_helper_test() {
+  in_temp_dir("sqlite_repo_log", fn(dir) {
+    let project_dir = dir <> "/sql_app"
+    new.run(project_dir, ["--db", "sqlite"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    gen.resource("posts", ["title:string"])
+
+    file_contains("src/sql_app/data/repo.gleam", "pub fn query(")
+    |> should.be_true
+    file_contains("src/sql_app/data/repo.gleam", "dev_log.sql(")
+    |> should.be_true
+    file_contains("src/sql_app/data/post_repo.gleam", "repo.query(")
+    |> should.be_true
+    file_contains("src/sql_app/data/post_repo.gleam", "sqlight.with_connection")
+    |> should.be_false
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn db_module_answers_every_subcommand_test() {
+  in_temp_dir("db_module", fn(dir) {
+    let project_dir = dir <> "/db_app"
+    new.run(project_dir, ["--db", "postgres"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    migrate_cmd.ensure_module("db_app", types.Postgres)
+
+    let path = "src/db_app/migrate.gleam"
+    file_exists(path) |> should.be_true
+    file_contains(path, "\"status\"") |> should.be_true
+    file_contains(path, "\"rollback\"") |> should.be_true
+    file_contains(path, "\"prune-sessions\"") |> should.be_true
+    file_contains(path, "migrate.run(") |> should.be_true
+    file_contains(path, "migrate.rollback(") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
+  })
+}
+
+pub fn jobs_module_answers_every_subcommand_test() {
+  in_temp_dir("jobs_module", fn(dir) {
+    let project_dir = dir <> "/jobs_app"
+    new.run(project_dir, ["--db", "postgres"])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    jobs_cmd.ensure_module("jobs_app", types.Postgres)
+
+    let path = "src/jobs_app/jobs.gleam"
+    file_exists(path) |> should.be_true
+    file_contains(path, "\"work\"") |> should.be_true
+    file_contains(path, "\"status\"") |> should.be_true
+    file_contains(path, "\"retry\"") |> should.be_true
+    file_contains(path, "\"discard\"") |> should.be_true
+    file_contains(path, "\"prune\"") |> should.be_true
+    file_contains(path, "--queues") |> should.be_true
+    file_contains(path, "jobs.Store(") |> should.be_true
+    file_contains(path, "with_queues(") |> should.be_true
 
     let assert Ok(_) = set_cwd(cwd)
     Nil

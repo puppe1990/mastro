@@ -1,14 +1,31 @@
 /// Code generators: page, resource, migration, auth.
 ///
+import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/result
 import gleam/string
 import mastro/cli/format
 import mastro/cli/project
 import mastro/cli/templates
 import mastro/cli/types.{type DbChoice, NoDb, Postgres, Sqlite}
 import simplifile
+
+/// Flags that change what a generated resource ships.
+pub type ResourceOptions {
+  ResourceOptions(public: Bool, paginate: Bool, seed: Bool, admin_auth: String)
+}
+
+fn parse_resource_options(args: List(String)) -> ResourceOptions {
+  ResourceOptions(
+    public: list.contains(args, "--public"),
+    paginate: list.contains(args, "--paginate"),
+    seed: !list.contains(args, "--no-seed"),
+    admin_auth: extract_flag_value(args, "--admin-auth")
+      |> result.unwrap("session"),
+  )
+}
 
 // =============================================================================
 // gen page
@@ -28,11 +45,11 @@ import lustre/element.{text}
 import lustre/element/html.{h1, section}
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, _ctx: Context) -> Response {
   section([class(\"" <> name <> "\")], [
     h1([], [text(\"" <> capitalize(name) <> "\")]),
   ])
-  |> root_layout.wrap(\"" <> capitalize(name) <> "\")
+  |> root_layout.wrap(\"" <> capitalize(name) <> "\", req)
   |> wisp.html_response(200)
 }
 "
@@ -72,17 +89,42 @@ pub fn resource(name: String, raw_args: List(String)) {
   let app = project.app_name()
   let db = project.detect_db()
   let api_mode = list.contains(raw_args, "--api")
+  let options = parse_resource_options(raw_args)
   let belongs_to = extract_flag_value(raw_args, "--belongs-to")
   let raw_fields = list.filter(raw_args, fn(a) { !string.starts_with(a, "--") })
   let singular = singularize(name)
   let type_name = capitalize(singular)
 
-  // Add foreign key field if --belongs-to is set
-  let extra_fields = case belongs_to {
-    Ok(parent) -> [#(singularize(parent) <> "_id", "int")]
-    Error(_) -> []
+  // `field:references` and `field:belongs_to` become `<field>_id` columns
+  // backed by a foreign key; `--belongs-to` is the older single-FK spelling.
+  let parsed = parse_fields(raw_fields)
+  let references =
+    parsed
+    |> list.filter_map(fn(f) {
+      case f.1 {
+        "references" | "belongs_to" -> Ok(singularize(f.0))
+        _ -> Error(Nil)
+      }
+    })
+    |> list.append(case belongs_to {
+      Ok(parent) -> [singularize(parent)]
+      Error(_) -> []
+    })
+
+  let scalar_fields =
+    parsed
+    |> list.filter(fn(f) { f.1 != "references" && f.1 != "belongs_to" })
+  let reference_fields =
+    references |> list.map(fn(parent) { #(parent <> "_id", "int") })
+  let fields = list.append(scalar_fields, reference_fields)
+
+  // Sortable columns: the scalar fields the index shows. The display field
+  // (search target) is the first one.
+  let sortable = list.map(scalar_fields, fn(f) { f.0 })
+  let display_field = case sortable {
+    [first, ..] -> first
+    [] -> "id"
   }
-  let fields = list.append(parse_fields(raw_fields), extra_fields)
 
   // Paths
   let handler_path = "src/" <> app <> "/web/" <> singular <> "_handler.gleam"
@@ -182,11 +224,23 @@ pub fn resource(name: String, raw_args: List(String)) {
   let assert Ok(_) =
     simplifile.write(
       repo_path,
-      resource_repo(app, singular, type_name, fields, db),
+      resource_repo(
+        app,
+        singular,
+        type_name,
+        fields,
+        db,
+        references,
+        sortable,
+        display_field,
+      ),
     )
 
   let assert Ok(_) =
-    simplifile.write(migration_path, resource_migration(name, fields, db))
+    simplifile.write(
+      migration_path,
+      resource_migration(name, fields, db, references),
+    )
 
   let assert Ok(_) =
     simplifile.write(test_path, case api_mode {
@@ -219,6 +273,31 @@ pub fn resource(name: String, raw_args: List(String)) {
   io.println("")
   io.println("Updated:")
   io.println("  " <> router_path)
+  io.println("")
+  io.println("Flags: " <> describe_options(options))
+  case references {
+    [] -> Nil
+    _ -> io.println("Foreign keys: " <> string.join(references, ", "))
+  }
+}
+
+fn describe_options(options: ResourceOptions) -> String {
+  let parts = [
+    case options.public {
+      True -> "public"
+      False -> "admin"
+    },
+    case options.paginate {
+      True -> "paginate"
+      False -> "no-paginate"
+    },
+    case options.seed {
+      True -> "seed"
+      False -> "no-seed"
+    },
+    "admin-auth=" <> options.admin_auth,
+  ]
+  string.join(parts, ", ")
 }
 
 // =============================================================================
@@ -234,7 +313,8 @@ pub fn migration(name: String) {
   let filename = number <> "_" <> name <> ".sql"
   let path = dir <> "/" <> filename
 
-  let content = "-- Migration: " <> name <> "\n-- Created: " <> number <> "\n\n"
+  let content =
+    "-- Migration: " <> name <> "\n" <> "-- up\n" <> "\n" <> "-- down\n" <> "\n"
 
   let assert Ok(_) = simplifile.write(path, content)
 
@@ -500,7 +580,7 @@ import lustre/element/html.{div, section}
 import lustre/server_component
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, _ctx: Context) -> Response {
+pub fn index(req: Request, _ctx: Context) -> Response {
   section([], [
     // Inline the Lustre server component client runtime
     server_component.script(),
@@ -513,7 +593,7 @@ pub fn index(_req: Request, _ctx: Context) -> Response {
       [text(\"Loading " <> type_name <> "...\")],
     ),
   ])
-  |> root_layout.wrap(\"" <> type_name <> "\")
+  |> root_layout.wrap(\"" <> type_name <> "\", req)
   |> wisp.html_response(200)
 }
 "
@@ -713,15 +793,24 @@ fn api_resource_handler(
     False -> ""
   }
 
-  "import gleam/int" <> extra_imports <> "
+  "import gleam/dict" <> extra_imports <> "
+import gleam/int
 import gleam/json
+import gleam/result
 import " <> app_name <> "/context.{type Context}
 import " <> app_name <> "/data/" <> resource_singular <> "_repo
 import " <> app_name <> "/domain/" <> resource_singular <> "
+import mastro/query
 import wisp.{type Request, type Response}
 
-pub fn index(_req: Request, ctx: Context) -> Response {
-  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ")
+pub fn index(req: Request, ctx: Context) -> Response {
+  let params = query.parse(req.query)
+  let q = dict.get(params, \"q\") |> result.unwrap(\"\")
+  let sort = dict.get(params, \"sort\") |> result.unwrap(\"\")
+  let dir = dict.get(params, \"dir\") |> result.unwrap(\"\")
+  let page = dict.get(params, \"page\") |> int.parse |> result.unwrap(1)
+
+  let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ", q, sort, dir, page)
   let body =
     json.array(items, to_json)
     |> json.to_string
@@ -830,6 +919,7 @@ import lustre/element/html.{
 }
 import " <> app_name <> "/domain/" <> resource_singular <> ".{type " <> type_name <> "}
 import " <> app_name <> "/web/forms/" <> resource_singular <> "_form
+import mastro/csrf
 
 pub fn index_view(items: List(" <> type_name <> ")) -> Element(Nil) {
   section([class(\"" <> resource_plural <> "\")], [
@@ -868,6 +958,7 @@ pub fn show_view(item: " <> type_name <> ") -> Element(Nil) {
 pub fn form_view(
   values: " <> resource_singular <> "_form." <> type_name <> "Form,
   errors: List(#(String, String)),
+  csrf_token: String,
 ) -> Element(Nil) {
   let post_action = case values.id {
     option.Some(id) -> \"/" <> resource_plural <> "/\" <> int.to_string(id)
@@ -880,6 +971,7 @@ pub fn form_view(
       option.None -> \"New " <> type_name <> "\"
     })]),
     form([attribute.action(post_action), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       case values.id {
         option.Some(_) -> input([type_(\"hidden\"), name(\"_method\"), value(\"put\")])
         option.None -> text(\"\")
@@ -1103,12 +1195,31 @@ fn resource_repo(
   type_name: String,
   fields: List(#(String, String)),
   db: DbChoice,
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   case db {
     Sqlite | NoDb ->
-      resource_repo_sqlite(app_name, resource_singular, type_name, fields)
+      resource_repo_sqlite(
+        app_name,
+        resource_singular,
+        type_name,
+        fields,
+        references,
+        sortable,
+        display,
+      )
     Postgres ->
-      resource_repo_pog(app_name, resource_singular, type_name, fields)
+      resource_repo_pog(
+        app_name,
+        resource_singular,
+        type_name,
+        fields,
+        references,
+        sortable,
+        display,
+      )
   }
 }
 
@@ -1117,11 +1228,16 @@ fn resource_repo_sqlite(
   resource_singular: String,
   type_name: String,
   fields: List(#(String, String)),
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   let table = resource_singular <> "s"
   let field_names = list.map(fields, fn(f) { f.0 }) |> string.join(", ")
   let select_fields = "id, " <> field_names
   let q = "\""
+  let sortable_literal = string_list_literal(sortable)
+  let options_fns = reference_option_fns(references)
 
   let decoder_fields =
     fields
@@ -1192,6 +1308,8 @@ fn resource_repo_sqlite(
         <> "_form.{type "
         <> type_name
         <> "Params}",
+      "import " <> app_name <> "/data/repo",
+      "import mastro/query",
       "import sqlight",
       "",
       "fn "
@@ -1208,29 +1326,53 @@ fn resource_repo_sqlite(
         <> "))",
       "}",
       "",
-      "pub fn list(db_path: String) -> List(" <> type_name <> ") {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  case sqlight.query("
+      "/// Search (LIKE on " <> display <> "), a whitelisted sort and a page.",
+      "pub fn list(",
+      "  db_path: String,",
+      "  search: String,",
+      "  sort: String,",
+      "  dir: String,",
+      "  page: Int,",
+      ") -> List(" <> type_name <> ") {",
+      "  let order = query.order_by(sort, dir, "
+        <> sortable_literal
+        <> ", \"id\")",
+      "  let offset = query.offset(page, query.per_page)",
+      "  case repo.query(",
+      "    db_path,",
+      "    "
         <> q
         <> "SELECT "
         <> select_fields
         <> " FROM "
         <> table
-        <> " ORDER BY id DESC"
+        <> " WHERE "
+        <> display
+        <> " LIKE ? "
         <> q
-        <> ", on: conn, with: [], expecting: "
-        <> resource_singular
-        <> "_decoder()) {",
+        <> " <> order <> "
+        <> q
+        <> " LIMIT ? OFFSET ?"
+        <> q
+        <> ",",
+      "    [",
+      "      sqlight.text(query.like_pattern(search)),",
+      "      sqlight.int(query.per_page),",
+      "      sqlight.int(offset),",
+      "    ],",
+      "    " <> resource_singular <> "_decoder(),",
+      "  ) {",
       "    Ok(rows) -> rows",
       "    Error(_) -> []",
       "  }",
       "}",
       "",
+      options_fns,
+      "",
       "pub fn get(db_path: String, id: Int) -> Result("
         <> type_name
         <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query("
+      "  repo.query(db_path, "
         <> q
         <> "SELECT "
         <> select_fields
@@ -1238,7 +1380,7 @@ fn resource_repo_sqlite(
         <> table
         <> " WHERE id = ?"
         <> q
-        <> ", on: conn, with: [sqlight.int(id)], expecting: "
+        <> ", [sqlight.int(id)], "
         <> resource_singular
         <> "_decoder())",
       "  |> result.replace_error(Nil)",
@@ -1255,8 +1397,8 @@ fn resource_repo_sqlite(
         <> "Params) -> Result("
         <> type_name
         <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query(",
+      "  repo.query(",
+      "    db_path,",
       "    "
         <> q
         <> "INSERT INTO "
@@ -1269,11 +1411,10 @@ fn resource_repo_sqlite(
         <> select_fields
         <> q
         <> ",",
-      "    on: conn,",
-      "    with: [",
+      "    [",
       insert_params,
       "    ],",
-      "    expecting: " <> resource_singular <> "_decoder(),",
+      "    " <> resource_singular <> "_decoder(),",
       "  )",
       "  |> result.replace_error(Nil)",
       "  |> result.try(fn(rows) {",
@@ -1289,8 +1430,8 @@ fn resource_repo_sqlite(
       "  id: Int,",
       "  params: " <> type_name <> "Params,",
       ") -> Result(" <> type_name <> ", Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query(",
+      "  repo.query(",
+      "    db_path,",
       "    "
         <> q
         <> "UPDATE "
@@ -1301,12 +1442,11 @@ fn resource_repo_sqlite(
         <> select_fields
         <> q
         <> ",",
-      "    on: conn,",
-      "    with: [",
+      "    [",
       insert_params,
       "      sqlight.int(id),",
       "    ],",
-      "    expecting: " <> resource_singular <> "_decoder(),",
+      "    " <> resource_singular <> "_decoder(),",
       "  )",
       "  |> result.replace_error(Nil)",
       "  |> result.try(fn(rows) {",
@@ -1318,14 +1458,13 @@ fn resource_repo_sqlite(
       "}",
       "",
       "pub fn delete(db_path: String, id: Int) -> Result(Nil, Nil) {",
-      "  use conn <- sqlight.with_connection(db_path)",
-      "  sqlight.query("
+      "  repo.query(db_path, "
         <> q
         <> "DELETE FROM "
         <> table
         <> " WHERE id = ?"
         <> q
-        <> ", on: conn, with: [sqlight.int(id)], expecting: decode.success(Nil))",
+        <> ", [sqlight.int(id)], decode.success(Nil))",
       "  |> result.replace(Nil)",
       "  |> result.replace_error(Nil)",
       "}",
@@ -1340,6 +1479,9 @@ fn resource_repo_pog(
   resource_singular: String,
   type_name: String,
   fields: List(#(String, String)),
+  references: List(String),
+  sortable: List(String),
+  display: String,
 ) -> String {
   let field_names =
     fields
@@ -1347,6 +1489,8 @@ fn resource_repo_pog(
     |> string.join(", ")
 
   let select_fields = "id, " <> field_names
+  let sortable_literal = string_list_literal(sortable)
+  let options_fns = reference_option_fns_pog(references)
 
   let decoder_fields =
     fields
@@ -1401,17 +1545,6 @@ fn resource_repo_pog(
 
   let q = "\""
   let table = resource_singular <> "s"
-
-  let list_query =
-    "  pog.query("
-    <> q
-    <> "SELECT "
-    <> select_fields
-    <> " FROM "
-    <> table
-    <> " ORDER BY id DESC"
-    <> q
-    <> ")"
 
   let get_query =
     "  pog.query("
@@ -1491,6 +1624,7 @@ fn resource_repo_pog(
         <> "_form.{type "
         <> type_name
         <> "Params}",
+      "import mastro/query",
       "import pog",
       "",
       "fn "
@@ -1507,13 +1641,43 @@ fn resource_repo_pog(
         <> "))",
       "}",
       "",
-      "pub fn list(db: pog.Connection) -> List(" <> type_name <> ") {",
-      list_query,
+      "/// Search (LIKE on " <> display <> "), a whitelisted sort and a page.",
+      "pub fn list(",
+      "  db: pog.Connection,",
+      "  search: String,",
+      "  sort: String,",
+      "  dir: String,",
+      "  page: Int,",
+      ") -> List(" <> type_name <> ") {",
+      "  let order = query.order_by(sort, dir, "
+        <> sortable_literal
+        <> ", \"id\")",
+      "  let pattern = query.like_pattern(search)",
+      "  pog.query("
+        <> q
+        <> "SELECT "
+        <> select_fields
+        <> " FROM "
+        <> resource_singular
+        <> "s WHERE "
+        <> display
+        <> " LIKE $1 "
+        <> q
+        <> " <> order <> "
+        <> q
+        <> " LIMIT $2 OFFSET $3"
+        <> q
+        <> ")",
+      "  |> pog.parameter(pog.text(pattern))",
+      "  |> pog.parameter(pog.int(query.per_page))",
+      "  |> pog.parameter(pog.int(query.offset(page, query.per_page)))",
       "  |> pog.returning(" <> resource_singular <> "_decoder())",
       "  |> pog.execute(db)",
       "  |> result.map(fn(r) { r.rows })",
       "  |> result.unwrap([])",
       "}",
+      "",
+      options_fns,
       "",
       "pub fn get(db: pog.Connection, id: Int) -> Result("
         <> type_name
@@ -1560,39 +1724,140 @@ fn resource_repo_pog(
   )
 }
 
+fn string_list_literal(items: List(String)) -> String {
+  "["
+  <> string.join(list.map(items, fn(item) { "\"" <> item <> "\"" }), ", ")
+  <> "]"
+}
+
+/// One `<parent>_options` function per foreign key, plus the shared decoder.
+fn reference_option_fns(references: List(String)) -> String {
+  case references {
+    [] -> ""
+    _ ->
+      references
+      |> list.map(fn(parent) {
+        "pub fn "
+        <> parent
+        <> "_options(db_path: String) -> List(#(Int, String)) {
+  case repo.query(
+    db_path,
+    \"SELECT id, COALESCE(name, title, CAST(id AS TEXT)) FROM "
+        <> parent
+        <> "s\",
+    [],
+    option_decoder(),
+  ) {
+    Ok(rows) -> rows
+    Error(_) -> []
+  }
+}
+
+"
+      })
+      |> string.join("")
+      |> fn(functions) {
+        functions <> "fn option_decoder() -> decode.Decoder(#(Int, String)) {
+  use id <- decode.field(0, decode.int)
+  use label <- decode.field(1, decode.string)
+  decode.success(#(id, label))
+}
+
+"
+      }
+  }
+}
+
+/// The Postgres spelling of the option functions.
+fn reference_option_fns_pog(references: List(String)) -> String {
+  case references {
+    [] -> ""
+    _ ->
+      references
+      |> list.map(fn(parent) {
+        "pub fn "
+        <> parent
+        <> "_options(db: pog.Connection) -> List(#(Int, String)) {
+  pog.query(\"SELECT id, COALESCE(name, title, id::text) FROM "
+        <> parent
+        <> "s\")
+  |> pog.returning(option_decoder())
+  |> pog.execute(db)
+  |> result.map(fn(r) { r.rows })
+  |> result.unwrap([])
+}
+
+"
+      })
+      |> string.join("")
+      |> fn(functions) {
+        functions <> "fn option_decoder() -> decode.Decoder(#(Int, String)) {
+  use id <- decode.field(0, decode.int)
+  use label <- decode.field(1, decode.string)
+  decode.success(#(id, label))
+}
+
+"
+      }
+  }
+}
+
 fn resource_migration(
   name: String,
   fields: List(#(String, String)),
   db: DbChoice,
+  references: List(String),
 ) -> String {
+  let reference_tables =
+    dict.from_list(
+      references
+      |> list.map(fn(parent) { #(parent <> "_id", parent <> "s") }),
+    )
+
   let column_defs =
     fields
     |> list.map(fn(f) {
       let #(field_name, field_type) = f
-      let sql_type = case db {
-        Sqlite -> to_sql_type_sqlite(field_type)
-        _ -> to_sql_type(field_type)
+      case dict.get(reference_tables, field_name) {
+        Ok(parent_table) ->
+          "  "
+          <> field_name
+          <> " INTEGER NOT NULL REFERENCES "
+          <> parent_table
+          <> "(id)"
+        Error(_) -> {
+          let sql_type = case db {
+            Sqlite -> to_sql_type_sqlite(field_type)
+            _ -> to_sql_type(field_type)
+          }
+          "  " <> field_name <> " " <> sql_type <> " NOT NULL"
+        }
       }
-      "  " <> field_name <> " " <> sql_type <> " NOT NULL"
     })
     |> string.join(",\n")
 
   let table = singularize(name) <> "s"
 
   case db {
-    Sqlite -> "CREATE TABLE " <> table <> " (
+    Sqlite -> "-- up
+CREATE TABLE " <> table <> " (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
 " <> column_defs <> ",
   inserted_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- down
+DROP TABLE " <> table <> ";
 "
-    _ -> "CREATE TABLE " <> table <> " (
+    _ -> "-- up
+CREATE TABLE " <> table <> " (
   id SERIAL PRIMARY KEY,
 " <> column_defs <> ",
   inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- down
+DROP TABLE " <> table <> ";
 "
   }
 }
@@ -1992,7 +2257,8 @@ pub fn create(
 }
 
 fn auth_migration() -> String {
-  "CREATE TABLE users (
+  "-- up
+CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   hashed_password TEXT NOT NULL,
@@ -2001,6 +2267,8 @@ fn auth_migration() -> String {
 );
 
 CREATE UNIQUE INDEX users_email_index ON users (email);
+-- down
+DROP TABLE users;
 "
 }
 
@@ -2081,6 +2349,7 @@ fn get_value(data: wisp.FormData, key: String) -> String {
 
 fn auth_handler(app: String) -> String {
   "import gleam/int
+import gleam/option
 import " <> app <> "/context.{type Context}
 import " <> app <> "/data/user_repo
 import " <> app <> "/domain/auth
@@ -2088,36 +2357,46 @@ import " <> app <> "/web/auth_views
 import " <> app <> "/web/error_handler
 import " <> app <> "/web/forms/auth_form
 import " <> app <> "/web/layouts/root_layout
+import mastro/csrf
 import mastro/flash
 import wisp.{type Request, type Response}
 
-pub fn login_page(_req: Request, _ctx: Context) -> Response {
-  auth_views.login_view(\"\", [])
-  |> root_layout.wrap(\"Log In\")
+pub fn login_page(req: Request, _ctx: Context) -> Response {
+  auth_views.login_view(\"\", [], csrf.token(req))
+  |> root_layout.wrap(\"Log In\", req)
   |> wisp.html_response(200)
 }
 
 pub fn login(req: Request, ctx: Context) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case auth_form.decode_login(form_data) {
     Error(errors) ->
-      auth_views.login_view(\"\", errors)
-      |> root_layout.wrap(\"Log In\")
+      auth_views.login_view(\"\", errors, csrf.token(req))
+      |> root_layout.wrap(\"Log In\", req)
       |> wisp.html_response(422)
 
     Ok(params) ->
       case user_repo.get_by_email(ctx.db, params.email) {
         Error(_) ->
-          auth_views.login_view(params.email, [#(\"email\", \"Invalid email or password\")])
-          |> root_layout.wrap(\"Log In\")
+          auth_views.login_view(
+            params.email,
+            [#(\"email\", \"Invalid email or password\")],
+            csrf.token(req),
+          )
+          |> root_layout.wrap(\"Log In\", req)
           |> wisp.html_response(422)
 
         Ok(user) ->
           case auth.verify_password(params.password, user.hashed_password) {
             False ->
-              auth_views.login_view(params.email, [#(\"email\", \"Invalid email or password\")])
-              |> root_layout.wrap(\"Log In\")
+              auth_views.login_view(
+                params.email,
+                [#(\"email\", \"Invalid email or password\")],
+                csrf.token(req),
+              )
+              |> root_layout.wrap(\"Log In\", req)
               |> wisp.html_response(422)
 
             True ->
@@ -2135,19 +2414,20 @@ pub fn login(req: Request, ctx: Context) -> Response {
   }
 }
 
-pub fn register_page(_req: Request, _ctx: Context) -> Response {
-  auth_views.register_view(\"\", [])
-  |> root_layout.wrap(\"Register\")
+pub fn register_page(req: Request, _ctx: Context) -> Response {
+  auth_views.register_view(\"\", [], csrf.token(req))
+  |> root_layout.wrap(\"Register\", req)
   |> wisp.html_response(200)
 }
 
 pub fn register(req: Request, ctx: Context) -> Response {
   use form_data <- wisp.require_form(req)
+  use <- csrf.require(req, option.Some(form_data))
 
   case auth_form.decode_register(form_data) {
     Error(errors) ->
-      auth_views.register_view(\"\", errors)
-      |> root_layout.wrap(\"Register\")
+      auth_views.register_view(\"\", errors, csrf.token(req))
+      |> root_layout.wrap(\"Register\", req)
       |> wisp.html_response(422)
 
     Ok(params) -> {
@@ -2165,8 +2445,12 @@ pub fn register(req: Request, ctx: Context) -> Response {
           |> flash.set_flash(req, \"info\", \"Account created\")
 
         Error(_) ->
-          auth_views.register_view(params.email, [#(\"email\", \"Could not create account\")])
-          |> root_layout.wrap(\"Register\")
+          auth_views.register_view(
+            params.email,
+            [#(\"email\", \"Could not create account\")],
+            csrf.token(req),
+          )
+          |> root_layout.wrap(\"Register\", req)
           |> wisp.html_response(422)
       }
     }
@@ -2188,11 +2472,17 @@ import lustre/element.{type Element, text}
 import lustre/element/html.{
   a, button, div, form, h1, input, label, p, section,
 }
+import mastro/csrf
 
-pub fn login_view(email: String, errors: List(#(String, String))) -> Element(Nil) {
+pub fn login_view(
+  email: String,
+  errors: List(#(String, String)),
+  csrf_token: String,
+) -> Element(Nil) {
   section([class(\"auth-form\")], [
     h1([], [text(\"Log In\")]),
     form([attribute.action(\"/login\"), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       div([class(\"field\")], [
         label([], [text(\"Email\")]),
         input([type_(\"email\"), name(\"email\"), value(email)]),
@@ -2215,10 +2505,12 @@ pub fn login_view(email: String, errors: List(#(String, String))) -> Element(Nil
 pub fn register_view(
   email: String,
   errors: List(#(String, String)),
+  csrf_token: String,
 ) -> Element(Nil) {
   section([class(\"auth-form\")], [
     h1([], [text(\"Register\")]),
     form([attribute.action(\"/register\"), attribute.method(\"post\")], [
+      csrf.hidden_field(csrf_token),
       div([class(\"field\")], [
         label([], [text(\"Email\")]),
         input([type_(\"email\"), name(\"email\"), value(email)]),

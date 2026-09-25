@@ -136,10 +136,17 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 | `mastro gen island <name>` | Lustre interactive island (client-side) |
 | `mastro gen live <name>` | Lustre server component (real-time over WebSocket) |
 | `mastro gen migration <name>` | SQL migration file |
+| `mastro gen component <stem> --list` | Seed / list kit component overrides |
+| `mastro destroy <kind> <name>` | Remove generated files and patches |
 | `mastro migrate` | Run pending migrations |
 | `mastro build` | Compile Lustre islands to JavaScript |
+| `mastro pwa [--bump] [--force]` | Install PWA assets (manifest, sw.js, icons) |
 | `mastro dev` | Dev server with file watching (auto-rebuild) |
-| `mastro routes` | Print the route table |
+| `mastro doctor [--mobile]` | Check the app against the Amarra contract |
+| `mastro console` | REPL over the app (history, `!N`, `!!`) |
+| `mastro link [path]` | Point `gleam.toml` at a local framework |
+| `mastro upgrade [version]` | Bump the framework and run doctor |
+| `mastro routes` | Print the route table (`--verbose` for middleware) |
 
 <br>
 
@@ -159,6 +166,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 
 - [x] Project scaffolding with Postgres or SQLite
 - [x] Full CRUD resource generator (handler, views, forms, domain, repo, migration, tests)
+- [x] Resource search, whitelisted sort and pagination (`mastro/query`), foreign keys via `:references`
 - [x] JSON API mode (`--api` flag, routes under `/api/`)
 - [x] Authentication generator (login, register, logout, sessions, middleware)
 - [x] Lustre interactive islands (`gen island`)
@@ -168,6 +176,11 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] Flash messages (signed cookies)
 - [x] Test helpers (request builders)
 - [x] Dev error page (dark theme, error details, stack trace, request info)
+- [x] Dev logs (`/logs`, JSON request/SQL lines, boot banner with LAN URLs)
+- [x] `mastro doctor [--mobile]` checks (layout, amarra.js, PWA, CSP, chat, health)
+- [x] PWA assets (`mastro pwa`), manifest, service worker and `GET /health` with LAN URLs
+- [x] i18n (`LOCALE` + `t`) and Open Graph / Twitter metadata from `APP_URL`
+- [x] CLI parity: `gen component`, `destroy`, `link`, `upgrade`, `console`, `routes --verbose`
 - [x] Dev file watcher (auto-rebuild on `src/` changes via fswatch)
 - [x] Auto-format all generated code
 - [x] Route table printer
@@ -216,6 +229,9 @@ See [`examples/tasks_app/`](examples/tasks_app/) for the complete app.
 | [Forms & Validation](docs/forms.md) | Typed decoders, validation helpers |
 | [Database](docs/database.md) | Postgres, SQLite, repos, migrations |
 | [Authentication](docs/authentication.md) | Sessions, middleware, customization |
+| [Dev logs](docs/dev-logs.md) | Request/SQL logging, `/logs`, boot banner |
+| [PWA & mobile](docs/pwa.md) | `mastro pwa`, manifest, service worker, `/health` |
+| [i18n & metadata](docs/i18n.md) | `LOCALE`, `t`, Open Graph / Twitter tags |
 | [Testing](docs/testing.md) | Generated tests, test helpers |
 | [Deployment](docs/deployment.md) | Production builds, Docker, Fly.io |
 | [CLI Reference](docs/cli.md) | All commands with flags and examples |

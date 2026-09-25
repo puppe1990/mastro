@@ -9,6 +9,8 @@
 
 export const DRIVE_HEADER = "Amarra-Drive";
 export const FRAME_HEADER = "Amarra-Frame";
+export const CSRF_HEADER = "X-CSRF-Token";
+export const CSRF_META = 'meta[name="csrf-token"]';
 export const MORPH_TARGETS = ["amarra-main", "amarra-nav", "amarra-toast-host"];
 export const THEME_KEY = "amarra-theme";
 
@@ -36,6 +38,11 @@ export function frameTarget(el) {
   return attr(el, "data-amarra-frame");
 }
 
+export function csrfToken(doc = document) {
+  const meta = doc && doc.querySelector ? doc.querySelector(CSRF_META) : null;
+  return meta ? attr(meta, "content") || "" : "";
+}
+
 export function shouldIntercept(el, origin) {
   if (!el || !el.href) return false;
   if (skipped(el)) return false;
@@ -50,9 +57,11 @@ export function shouldIntercept(el, origin) {
   }
 }
 
-async function fetchDrive(url, headers = {}) {
+async function fetchDrive(url, doc = document, headers = {}) {
+  const token = csrfToken(doc);
+  const csrf = token ? { [CSRF_HEADER]: token } : {};
   const response = await fetch(url, {
-    headers: { ...headers, [DRIVE_HEADER]: "true" },
+    headers: { ...headers, ...csrf, [DRIVE_HEADER]: "true" },
   });
   if (!response.ok) return null;
   const type = response.headers.get("content-type") || "";
@@ -371,7 +380,7 @@ export function start(doc = document) {
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey) return;
     if (!shouldIntercept(anchor, window.location.origin)) return;
     event.preventDefault();
-    const result = await fetchDrive(anchor.href);
+    const result = await fetchDrive(anchor.href, doc);
     if (!result) return;
     if (result.stream) applyStream(result.text, doc);
     else applyDriveHTML(result.text, doc);

@@ -171,34 +171,68 @@ CREATE TABLE tasks (
 
 ### Running migrations
 
-PostgreSQL:
-
 ```bash
-psql my_app_dev < src/my_app/data/migrations/001_create_posts.sql
+mastro migrate              # apply the pending ones
+mastro db status            # list applied and pending
 ```
 
-SQLite:
+`mastro migrate` writes `src/<app>/migrate.gleam` on first use and runs it.
+The same module answers every `mastro db` command:
 
 ```bash
-sqlite3 my_app.db < src/my_app/data/migrations/001_create_tasks.sql
+mastro db status            # applied and pending, in file order
+mastro db rollback          # revert the most recent migration
+mastro db prune-sessions    # delete expired sessions
+mastro db seed              # run the project seeds
+mastro db seed --list       # list the seed helpers
+```
+
+### Up and down
+
+Every migration may carry both halves:
+
+```sql
+-- up
+CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL);
+-- down
+DROP TABLE posts;
+```
+
+A file without markers is entirely the `up`, and `rollback` just drops its
+ledger row — the schema is left alone, which is the honest thing to do when
+you never said how to undo it.
+
+A file marked `-- dev-only` is skipped when `APP_ENV=prod` unless the run is
+explicit — a demo user does not belong in production.
+
+### Idempotent by ledger
+
+Applied migrations are recorded in `schema_migrations`, so running the same
+directory twice applies nothing the second time:
+
+```bash
+mastro migrate   # Applied 2 migration(s).
+mastro migrate   # Nothing to apply.
 ```
 
 ### Programmatic migration runner
 
-The `mastro/migrate` module can run migrations from your app code:
+The `mastro/migrate` module runs migrations from your app code:
 
 ```gleam
 import mastro/migrate
 
-let count = migrate.run_from_directory(
-  db_execute,      // fn(String) -> Result(Nil, String)
-  db_query_strings, // fn(String) -> Result(List(String), String)
-  "src/my_app/data/migrations",
-)
+let options =
+  migrate.Options(now: migrate.now(), production: False, explicit: True)
+
+case migrate.run(db_execute, db_query_strings, "src/my_app/data/migrations", options) {
+  Ok(report) -> // report.applied, report.skipped
+  Error(error) -> // the SQL that failed
+}
 ```
 
-The runner tracks applied migrations in a `_migrations` table and
-only runs pending ones.
+`migrate.status`, `migrate.rollback` and `migrate.parse` take the same
+callbacks, so an editor script or a boot hook can reuse them.
 
 ## Adding a database later
 

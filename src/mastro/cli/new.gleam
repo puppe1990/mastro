@@ -69,8 +69,12 @@ pub fn run(path: String, flags: List(String)) {
       templates.error_handler(name),
     ),
     #(
+      path <> "/src/" <> name <> "/web/health_handler.gleam",
+      templates.health_handler(name),
+    ),
+    #(
       path <> "/src/" <> name <> "/web/layouts/root_layout.gleam",
-      templates.root_layout(),
+      templates.root_layout(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/components/flash.gleam",
@@ -125,6 +129,7 @@ pub fn run(path: String, flags: List(String)) {
   io.println("      " <> name <> "/web/")
   io.println("        home_handler.gleam")
   io.println("        error_handler.gleam")
+  io.println("        health_handler.gleam")
   io.println("      " <> name <> "/web/layouts/")
   io.println("        root_layout.gleam")
   io.println("      " <> name <> "/web/components/")

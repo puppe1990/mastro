@@ -73,6 +73,30 @@ API: 5 routes under `/api/` prefix).
 
 **Field types:** See [Field Types](field-types.md).
 
+**Foreign keys:** mark a field with `:references` (or `:belongs_to`) and it
+becomes an `<field>_id` column backed by a foreign key, with a
+`<parent>_options` function in the repo for select inputs:
+
+```bash
+mastro gen resource posts title:string author:references
+# author_id INTEGER NOT NULL REFERENCES authors(id)
+```
+
+**Flags:**
+
+| Flag | Effect |
+|------|--------|
+| `--api` | JSON API mode (no views/forms, routes under `/api/`) |
+| `--public` | Public list (no admin gate) |
+| `--paginate` | 25 rows per page with `<.pagination>` |
+| `--no-seed` | Skip the demo seed |
+| `--admin-auth session\|bearer` | Admin auth for the resource (default `session`) |
+
+**Index:** the generated `list/5` takes `(search, sort, dir, page)`.
+`search` is a `LIKE` on the display field, `sort` is only honoured for
+whitelisted columns (anything else — including a bad direction — falls
+back safely via `mastro/query`), and `page` is 25 rows.
+
 **Naming:** The resource name should be plural (`posts`, not `post`).
 The generator singularizes it for types (`Post`) and file names
 (`post_handler.gleam`).
@@ -162,12 +186,54 @@ mastro gen migration create_comments
 
 ---
 
-### `mastro routes`
+### `mastro gen component <stem> [--list] [--dry-run]`
+
+Seed an app-owned override for a shipped kit component, so the app restyles
+the real contract instead of recreating it. In the Lustre view layer an
+override is a module registered with `view.with_component` (ADR 0001).
+
+```bash
+mastro gen component --list          # print the overridable stems
+mastro gen component locale-toggle   # seed web/components/locale_toggle.gleam
+mastro gen component card --dry-run  # print the path, write nothing
+```
+
+**Creates:** `src/<app>/web/components/<stem>.gleam` with the
+`(attrs, inner) -> Element` shape.
+
+---
+
+### `mastro destroy <kind> <name> [--dry-run]`
+
+Remove generated files and undo the router patches.
+
+```bash
+mastro destroy resource posts
+mastro destroy handler about
+mastro destroy model post
+mastro destroy migration add_email_to_posts
+mastro destroy auth
+mastro destroy resource posts --dry-run
+```
+
+- `resource` removes the handler/views/form/domain/repo/test and its
+  `create_` migration, and unroutes it.
+- `handler` removes the handler and its test.
+- `model` removes the domain type and repo.
+- `migration` deletes `*_<name>.sql` only — it never touches the
+  `schema_migrations` ledger.
+- `auth` removes the auth modules and unroutes them.
+- `--dry-run` prints every change without writing.
+
+---
+
+### `mastro routes [--verbose]`
 
 Print the route table from `router.gleam`.
 
 ```bash
 mastro routes
+mastro routes --verbose
 ```
 
 **Output:**
@@ -178,6 +244,14 @@ GET     /posts              post_handler.index
 GET     /posts/new          post_handler.new
 POST    /posts              post_handler.create
 GET     /posts/:id          post_handler.show
+```
+
+`--verbose` adds the middleware stack and a static warning when two routes
+can match the same method and path shape:
+
+```
+Middleware: method_override -> dev_log.request_log -> dev_error.rescue -> security.headers -> serve_static -> csrf.issue
+warning: GET /posts/new may shadow GET /posts/:id
 ```
 
 ---
@@ -194,6 +268,60 @@ On first run, generates a `src/<app>/migrate.gleam` module that
 connects to the database and runs pending SQL files. Then executes it.
 
 Requires a database (`--db postgres` or `--db sqlite`).
+
+---
+
+### `mastro db`
+
+Database commands, answered by the generated module.
+
+```bash
+mastro db status            # list applied and pending migrations
+mastro db rollback          # revert the most recent migration
+mastro db prune-sessions    # delete expired sessions
+mastro db seed              # run the project seeds
+mastro db seed --list       # list the public helpers in the seed module
+```
+
+`status`, `rollback` and `prune-sessions` need a database; `seed` reuses
+the seed module, creating it on first run.
+
+---
+
+### `mastro jobs`
+
+Run and inspect the job queue.
+
+```bash
+mastro jobs work --queues send-email --concurrency 4
+mastro jobs status
+mastro jobs retry 42
+mastro jobs discard 42
+mastro jobs prune
+```
+
+On first run, generates a `src/<app>/jobs.gleam` worker that shares the
+app's database, then runs it. `work` drains the queue and requeues what a
+dead worker left behind.
+
+---
+
+### `mastro pwa [--bump] [--force]`
+
+Install the PWA assets: `amarra.js`, `manifest.webmanifest`, `sw.js`, the
+placeholder icons and `og.png`.
+
+```bash
+mastro pwa
+mastro pwa --bump
+mastro pwa --force
+```
+
+- `--bump` increments `CACHE_VERSION` in `sw.js`.
+- `--force` resets the brand and the cache version.
+- Without `--force`, existing files are preserved.
+
+See [PWA & mobile](pwa.md) for the manifest contract and `/health`.
 
 ---
 
@@ -226,6 +354,88 @@ mastro dev
 ```
 
 Wraps `gleam run` with the dev environment variable set.
+
+---
+
+### `mastro doctor [--mobile]`
+
+Check the app against the Amarra contract and print one line per check.
+Exits `1` when anything fails.
+
+```bash
+mastro doctor
+mastro doctor --mobile
+```
+
+Core checks: the mastro dependency, `priv/static/`, the layout rendering
+`#amarra-main`, `priv/static/js/amarra.js`, `manifest.webmanifest`, the
+service worker, the jobs dashboard and the icon/og placeholders.
+
+`--mobile` adds the on-device checks: flash inside `#amarra-main`, no
+`fonts.googleapis.com` in the source (blocked by the default CSP),
+`amarra.js` served network-first in `sw.js`, the `#chat-messages`
+container, and `GET /health` returning `lan_urls`.
+
+```
+mastro doctor
+  [ok  ] dependency: gleam.toml depends on mastro
+  [ok  ] static: priv/static/ exists
+  [fail] amarra.js: priv/static/js/amarra.js is missing — run `mastro pwa` to install the default assets
+  ...
+  1 failed, 3 warning(s)
+```
+
+---
+
+### `mastro console`
+
+Open a REPL over the project.
+
+```bash
+mastro console
+```
+
+```
+mastro> SELECT count(*) FROM users
+mastro> history
+  1  SELECT count(*) FROM users
+mastro> !1
+mastro> exit
+```
+
+Commands: `help`, `history`, `!N` (re-run entry N), `!!` (re-run the last
+command), `exit`/`quit`. The `store`, `cfg` and `db` bindings are in scope.
+The line handling lives in `mastro/console` and is pure, so it is tested
+without a terminal.
+
+---
+
+### `mastro link [path] [--unlink]`
+
+Point `gleam.toml` at a local checkout of the framework for development.
+
+```bash
+mastro link ../mastro
+mastro link --unlink
+```
+
+Writes `mastro = { path = "../mastro" }`. This is local-only — do not
+commit it; `--unlink` restores the published version constraint.
+
+---
+
+### `mastro upgrade [version] [--dry-run]`
+
+Bump the mastro constraint, print the migration steps, and run
+`mastro doctor`.
+
+```bash
+mastro upgrade
+mastro upgrade 0.3.0
+mastro upgrade --dry-run
+```
+
+`--dry-run` reports the change and the steps without writing.
 
 ---
 
