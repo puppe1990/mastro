@@ -166,6 +166,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 
 - [x] Project scaffolding with Postgres or SQLite
 - [x] Full CRUD resource generator (handler, views, forms, domain, repo, migration, tests)
+- [x] Resource search, whitelisted sort and pagination (`mastro/query`), foreign keys via `:references`
 - [x] JSON API mode (`--api` flag, routes under `/api/`)
 - [x] Authentication generator (login, register, logout, sessions, middleware)
 - [x] Lustre interactive islands (`gen island`)
