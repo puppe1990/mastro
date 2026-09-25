@@ -12,6 +12,7 @@ record.
 | `SECRET_KEY_BASE` | dev fallback | Secret for signing cookies (64+ chars) |
 | `APP_ENV` | `dev` | Environment: `dev`, `test`, or `prod` |
 | `LOG_FORMAT` | `json` in dev, `text` otherwise | Request/SQL line format |
+| `LOCALE` | `en` | UI locale: `en` or `pt` (see [i18n & metadata](i18n.md)) |
 
 `LOG_FORMAT=text` prints the classic `200 GET /posts (4ms)` lines; anything
 else (or `json`) prints one JSON object per line. See
