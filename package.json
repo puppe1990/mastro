@@ -1,0 +1,8 @@
+{
+  "name": "mastro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test priv/static/js/*.test.mjs"
+  }
+}

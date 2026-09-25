@@ -24,6 +24,10 @@ jobs:
           gleam-version: "1.14"
           rebar3-version: "3"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Check formatting
         run: gleam format --check
 
@@ -32,6 +36,9 @@ jobs:
 
       - name: Test
         run: gleam test
+
+      - name: JS tests
+        run: npm test
 
       - name: Docs
         run: gleam docs build
