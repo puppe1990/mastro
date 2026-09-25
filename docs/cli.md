@@ -214,6 +214,24 @@ the seed module, creating it on first run.
 
 ---
 
+### `mastro jobs`
+
+Run and inspect the job queue.
+
+```bash
+mastro jobs work --queues send-email --concurrency 4
+mastro jobs status
+mastro jobs retry 42
+mastro jobs discard 42
+mastro jobs prune
+```
+
+On first run, generates a `src/<app>/jobs.gleam` worker that shares the
+app's database, then runs it. `work` drains the queue and requeues what a
+dead worker left behind.
+
+---
+
 ### `mastro build`
 
 Compile Lustre islands to JavaScript.
