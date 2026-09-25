@@ -287,7 +287,10 @@ fn health_check(files: Dict(String, String)) -> Check {
         "no /health route — add one that returns lan_urls for on-device testing",
       )
     Some(#(_, content)) ->
-      case string.contains(content, "lan_urls") {
+      case
+        string.contains(content, "lan_urls")
+        || string.contains(content, "health.respond")
+      {
         True -> Check("health", Pass, "/health returns lan_urls")
         False ->
           Check(

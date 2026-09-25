@@ -3,6 +3,7 @@
 
 run_dev() ->
     os:putenv("APP_ENV", "dev"),
+    maybe_bump_cache(),
     %% Check if fswatch is available for file watching
     case os:find_executable("fswatch") of
         false ->
@@ -61,4 +62,31 @@ relay_and_wait(Port) ->
             nil;
         _ ->
             relay_and_wait(Port)
+    end.
+
+%% Bump the service worker cache version on every dev boot, so a reload
+%% never serves a stale amarra.js. A missing sw.js (no `mastro pwa` yet) is
+%% not an error.
+maybe_bump_cache() ->
+    Path = "priv/static/js/sw.js",
+    case file:read_file(Path) of
+        {ok, Bin} ->
+            Content = binary_to_list(Bin),
+            case re:run(Content, "CACHE_VERSION = ([0-9]+)", [{capture, [1], list}]) of
+                {match, [Digits]} ->
+                    Version = list_to_integer(Digits),
+                    Replacement = "CACHE_VERSION = " ++ integer_to_list(Version + 1),
+                    Updated = re:replace(
+                        Content,
+                        "CACHE_VERSION = [0-9]+",
+                        Replacement,
+                        [{return, list}]
+                    ),
+                    ok = file:write_file(Path, list_to_binary(Updated)),
+                    io:format("  bumped sw.js CACHE_VERSION to ~p~n", [Version + 1]);
+                nomatch ->
+                    ok
+            end;
+        {error, _} ->
+            ok
     end.

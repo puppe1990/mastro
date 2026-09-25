@@ -12,6 +12,7 @@ import mastro/cli/gen
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
+import mastro/cli/pwa
 import mastro/cli/types
 import mastro/doctor
 import simplifile
@@ -34,6 +35,10 @@ fn file_exists(path: String) -> Bool {
     Ok(_) -> True
     Error(_) -> False
   }
+}
+
+fn path_exists(path: String) -> Bool {
+  simplifile.is_file(path) |> result.unwrap(False)
 }
 
 fn file_contains(path: String, substring: String) -> Bool {
@@ -142,6 +147,60 @@ pub fn new_app_wires_dev_logs_and_the_banner_test() {
       "dev_log.request_log",
     )
     |> should.be_true
+  })
+}
+
+// =============================================================================
+// health and PWA
+// =============================================================================
+
+pub fn new_app_serves_health_with_lan_urls_test() {
+  in_temp_dir("health", fn(dir) {
+    let project_dir = dir <> "/health_app"
+    new.run(project_dir, [])
+
+    file_exists(project_dir <> "/src/health_app/web/health_handler.gleam")
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/web/health_handler.gleam",
+      "health.respond",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/router.gleam",
+      "health_handler.index",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/health_app/web/layouts/root_layout.gleam",
+      "amarra-main",
+    )
+    |> should.be_true
+  })
+}
+
+pub fn pwa_installs_assets_and_bump_increments_test() {
+  in_temp_dir("pwa", fn(dir) {
+    let project_dir = dir <> "/pwa_app"
+    new.run(project_dir, [])
+
+    let assert Ok(cwd) = current_directory()
+    let assert Ok(_) = set_cwd(project_dir)
+
+    pwa.run([])
+
+    file_exists("priv/static/js/amarra.js") |> should.be_true
+    file_exists("priv/static/manifest.webmanifest") |> should.be_true
+    path_exists("priv/static/icons/icon-512.png") |> should.be_true
+    path_exists("priv/static/icons/icon-512-maskable.png") |> should.be_true
+    path_exists("priv/static/og.png") |> should.be_true
+    file_contains("priv/static/js/sw.js", "CACHE_VERSION = 1") |> should.be_true
+
+    pwa.run(["--bump"])
+    file_contains("priv/static/js/sw.js", "CACHE_VERSION = 2") |> should.be_true
+
+    let assert Ok(_) = set_cwd(cwd)
+    Nil
   })
 }
 

@@ -82,6 +82,7 @@ pub fn main_module(name: String, db: DbChoice) -> String {
   }
 
   "import gleam/erlang/process
+import gleam/int
 import gleam/io
 import mist
 import " <> name <> "/config
@@ -111,7 +112,9 @@ pub fn main() {
   dev_log.install(logs)
 
   // A busy preferred port should not stop the dev server; take the next free.
-  let port = net.pick_port(cfg.port, 10)" <> db_open <> "
+  let port = net.pick_port(cfg.port, 10)
+  // Keep the resolved port in config so /health reports the URL that answers.
+  let cfg = config.Config(..cfg, port: port, port_string: int.to_string(port))" <> db_open <> "
   let ctx = context.Context(" <> ctx_args <> ")
 
   let assert Ok(_) =
@@ -266,6 +269,7 @@ pub fn router_module(name: String, _db: DbChoice) -> String {
 import " <> name <> "/config
 import " <> name <> "/context.{type Context}
 import " <> name <> "/web/error_handler
+import " <> name <> "/web/health_handler
 import " <> name <> "/web/home_handler
 import mastro/csrf
 import mastro/dev_error
@@ -278,6 +282,7 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req), req.method {
     [], http.Get -> home_handler.index(req, ctx)
+    [\"health\"], http.Get -> health_handler.index(req, ctx)
     [\"logs\"], http.Get ->
       dev_log.viewer(ctx.logs, config.is_development(ctx.config), req)
     _, _ -> error_handler.not_found(req)
@@ -351,15 +356,15 @@ pub fn internal_error(_req: Request) -> Response {
 }
 
 pub fn root_layout() -> String {
-  "import lustre/attribute.{charset, class, content, href, name, rel}
+  "import lustre/attribute.{charset, class, content, href, id, name, rel, src}
 import lustre/element.{type Element}
-import lustre/element/html.{body, head, html, link, main, meta, title}
+import lustre/element/html.{body, div, head, html, link, main, meta, nav, script, title}
 import mastro/csrf
 import wisp.{type Request}
 
-/// Render a page: `content |> root_layout.wrap(\"Title\", req)`. The request
-/// carries the CSRF token the middleware threaded, so amarra.js can echo it
-/// in the `X-CSRF-Token` header.
+/// Render a page: `content |> root_layout.wrap(\"Title\", req)`. Drive morphs
+/// `#amarra-main`, so the id is part of the contract; `amarra.js` loads at
+/// the end of the body to wire the kit hooks and Drive navigation.
 pub fn wrap(inner: Element(Nil), page_title: String, req: Request) -> String {
   html([], [
     head([], [
@@ -369,9 +374,26 @@ pub fn wrap(inner: Element(Nil), page_title: String, req: Request) -> String {
       title([], page_title),
       link([rel(\"stylesheet\"), href(\"/static/css/app.css\")]),
     ]),
-    body([], [main([class(\"container\")], [inner])]),
+    body([], [
+      nav([id(\"amarra-nav\")], []),
+      main([id(\"amarra-main\"), class(\"container\")], [inner]),
+      div([id(\"amarra-toast-host\")], []),
+      script([src(\"/static/js/amarra.js\")], \"\"),
+    ]),
   ])
   |> element.to_document_string
+}
+"
+}
+
+pub fn health_handler(name: String) -> String {
+  "import " <> name <> "/context.{type Context}
+import mastro/health
+import wisp.{type Request, type Response}
+
+/// `GET /health` — the LAN URLs a phone can use to reach this server.
+pub fn index(_req: Request, ctx: Context) -> Response {
+  health.respond(ctx.config.port)
 }
 "
 }
