@@ -8,6 +8,7 @@ import gleam/result
 import gleam/string
 import mastro/cli/files
 import mastro/cli/format
+import mastro/cli/gen/fields
 import mastro/cli/gen/options
 import mastro/cli/gen/source
 import mastro/cli/project
@@ -91,7 +92,7 @@ pub fn resource(name: String, raw_args: List(String)) {
 
   // `field:references` and `field:belongs_to` become `<field>_id` columns
   // backed by a foreign key; `--belongs-to` is the older single-FK spelling.
-  let parsed = parse_fields(raw_fields)
+  let parsed = fields.parse_fields(raw_fields)
   let references =
     parsed
     |> list.filter_map(fn(f) {
@@ -172,7 +173,7 @@ pub fn resource(name: String, raw_args: List(String)) {
   let gleam_fields =
     list.map(fields, fn(f) {
       let #(field_name, field_type) = f
-      #(field_name, to_gleam_type(field_type))
+      #(field_name, fields.to_gleam_type(field_type))
     })
 
   // Generate handler (HTML or JSON)
@@ -869,7 +870,7 @@ fn api_params_module(
     fields
     |> list.map(fn(f) {
       let #(name, ft) = f
-      "    " <> name <> ": " <> to_gleam_type(ft) <> ","
+      "    " <> name <> ": " <> fields.to_gleam_type(ft) <> ","
     })
     |> string.join("\n")
 
@@ -1316,7 +1317,8 @@ fn resource_form(
     fields
     |> list.map(fn(f) {
       let #(field_name, field_type) = f
-      "    " <> field_name <> ": " <> form_default_value(field_type) <> ","
+      let default_value = fields.form_default_value(field_type)
+      "    " <> field_name <> ": " <> default_value <> ","
     })
     |> string.join("\n")
 
@@ -1324,7 +1326,7 @@ fn resource_form(
     fields
     |> list.map(fn(f) {
       let #(name, ft) = f
-      "    " <> name <> ": " <> to_gleam_type(ft) <> ","
+      "    " <> name <> ": " <> fields.to_gleam_type(ft) <> ","
     })
     |> string.join("\n")
 
@@ -1332,7 +1334,7 @@ fn resource_form(
     fields
     |> list.map(fn(f) {
       let #(name, ft) = f
-      "    " <> name <> ": " <> to_gleam_type(ft) <> ","
+      "    " <> name <> ": " <> fields.to_gleam_type(ft) <> ","
     })
     |> string.join("\n")
 
@@ -2397,8 +2399,8 @@ fn resource_migration(
           <> "(id)"
         Error(_) -> {
           let sql_type = case db {
-            Sqlite -> to_sql_type_sqlite(field_type)
-            _ -> to_sql_type(field_type)
+            Sqlite -> fields.to_sql_type_sqlite(field_type)
+            _ -> fields.to_sql_type(field_type)
           }
           "  " <> field_name <> " " <> sql_type <> " NOT NULL"
         }
@@ -2683,68 +2685,6 @@ fn add_route(content: String, route_line: String) -> String {
         Ok(#(before, after)) -> before <> route_line <> "\n    _ ->" <> after
         Error(_) -> content
       }
-  }
-}
-
-// =============================================================================
-// Field parsing and type conversion
-// =============================================================================
-
-pub fn parse_fields(raw: List(String)) -> List(#(String, String)) {
-  raw
-  |> list.filter_map(fn(field) {
-    case string.split(field, ":") {
-      [name, field_type] -> Ok(#(name, field_type))
-      _ -> Error(Nil)
-    }
-  })
-}
-
-pub fn to_gleam_type(field_type: String) -> String {
-  case field_type {
-    "string" -> "String"
-    "text" -> "String"
-    "int" -> "Int"
-    "float" -> "Float"
-    "bool" -> "Bool"
-    "date" -> "String"
-    "datetime" -> "String"
-    _ -> "String"
-  }
-}
-
-pub fn to_sql_type(field_type: String) -> String {
-  case field_type {
-    "string" -> "TEXT"
-    "text" -> "TEXT"
-    "int" -> "INTEGER"
-    "float" -> "DOUBLE PRECISION"
-    "bool" -> "BOOLEAN"
-    "date" -> "DATE"
-    "datetime" -> "TIMESTAMPTZ"
-    _ -> "TEXT"
-  }
-}
-
-fn to_sql_type_sqlite(field_type: String) -> String {
-  case field_type {
-    "string" -> "TEXT"
-    "text" -> "TEXT"
-    "int" -> "INTEGER"
-    "float" -> "REAL"
-    "bool" -> "INTEGER"
-    "date" -> "TEXT"
-    "datetime" -> "TEXT"
-    _ -> "TEXT"
-  }
-}
-
-fn form_default_value(field_type: String) -> String {
-  case field_type {
-    "bool" -> "False"
-    "int" -> "0"
-    "float" -> "0.0"
-    _ -> "\"\""
   }
 }
 

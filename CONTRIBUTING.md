@@ -82,12 +82,11 @@ examples/
 
 ## Adding a new field type
 
-1. Add to `to_gleam_type()` in `gen.gleam`
-2. Add to `to_sql_type()` and `to_sql_type_sqlite()` in `gen.gleam`
-3. Add to `form_default_value()` in `gen.gleam`
-4. Handle in form view rendering (the `form_field_elements` builder)
-5. Handle in `from_form_data` (the form decoder)
-6. Update `docs/field-types.md`
+1. Add the mapping in `src/mastro/cli/gen/fields.gleam` — `to_gleam_type`,
+   `to_sql_type`, `to_sql_type_sqlite` and `form_default_value`
+2. Handle in form view rendering (the `form_field_elements` builder)
+3. Handle in `from_form_data` (the form decoder)
+4. Update `docs/field-types.md`
 
 ## Conventions
 
