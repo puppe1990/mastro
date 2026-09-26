@@ -4,7 +4,10 @@ import gleam/io
 import gleam/list
 import gleam/string
 import mastro/cli/format
-import mastro/cli/templates
+import mastro/cli/templates/app
+import mastro/cli/templates/assets
+import mastro/cli/templates/project
+import mastro/cli/templates/web
 import mastro/cli/types.{type DbChoice, NoDb, Postgres, Sqlite}
 import simplifile
 
@@ -47,45 +50,39 @@ pub fn run(path: String, flags: List(String)) {
 
   // Write files
   let files = [
-    #(path <> "/gleam.toml", templates.gleam_toml(name, db)),
-    #(path <> "/.gitignore", templates.gitignore()),
-    #(path <> "/README.md", templates.readme(name)),
-    #(path <> "/src/" <> name <> ".gleam", templates.main_module(name, db)),
-    #(path <> "/src/" <> name <> "/config.gleam", templates.config_module(name)),
-    #(
-      path <> "/src/" <> name <> "/context.gleam",
-      templates.context_module(name, db),
-    ),
-    #(
-      path <> "/src/" <> name <> "/router.gleam",
-      templates.router_module(name, db),
-    ),
+    #(path <> "/gleam.toml", project.gleam_toml(name, db)),
+    #(path <> "/.gitignore", project.gitignore()),
+    #(path <> "/README.md", project.readme(name)),
+    #(path <> "/src/" <> name <> ".gleam", app.main_module(name, db)),
+    #(path <> "/src/" <> name <> "/config.gleam", app.config_module(name)),
+    #(path <> "/src/" <> name <> "/context.gleam", app.context_module(name, db)),
+    #(path <> "/src/" <> name <> "/router.gleam", web.router_module(name, db)),
     #(
       path <> "/src/" <> name <> "/web/home_handler.gleam",
-      templates.home_handler(name),
+      web.home_handler(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/error_handler.gleam",
-      templates.error_handler(name),
+      web.error_handler(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/health_handler.gleam",
-      templates.health_handler(name),
+      web.health_handler(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/layouts/root_layout.gleam",
-      templates.root_layout(name),
+      web.root_layout(name),
     ),
     #(
       path <> "/src/" <> name <> "/web/components/flash.gleam",
-      templates.flash_component(),
+      web.flash_component(),
     ),
-    #(path <> "/priv/static/css/app.css", templates.app_css()),
-    #(path <> "/priv/static/js/app.js", templates.app_js()),
-    #(path <> "/test/" <> name <> "_test.gleam", templates.main_test(name)),
+    #(path <> "/priv/static/css/app.css", assets.app_css()),
+    #(path <> "/priv/static/js/app.js", assets.app_js()),
+    #(path <> "/test/" <> name <> "_test.gleam", app.main_test(name)),
     #(
       path <> "/test/" <> name <> "/web/home_handler_test.gleam",
-      templates.home_handler_test(name),
+      app.home_handler_test(name),
     ),
   ]
 
@@ -94,7 +91,7 @@ pub fn run(path: String, flags: List(String)) {
     Postgres | Sqlite -> [
       #(
         path <> "/src/" <> name <> "/data/repo.gleam",
-        templates.repo_module(name, db),
+        app.repo_module(name, db),
       ),
       ..files
     ]

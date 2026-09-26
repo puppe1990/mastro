@@ -17,7 +17,7 @@ import mastro/cli/gen/resource_tests
 import mastro/cli/gen/resource_views
 import mastro/cli/gen/router
 import mastro/cli/project
-import mastro/cli/templates
+import mastro/cli/templates/resource
 import mastro/cli/text
 import mastro/cli/types.{BearerAuth, SessionAuth}
 import simplifile
@@ -137,7 +137,7 @@ pub fn resource(name: String, raw_args: List(String)) {
     False ->
       simplifile.write(
         handler_path,
-        templates.resource_handler(
+        resource.resource_handler(
           app,
           name,
           singular,
@@ -189,7 +189,7 @@ pub fn resource(name: String, raw_args: List(String)) {
   let assert Ok(_) =
     simplifile.write(
       domain_path,
-      templates.resource_domain_type(type_name, gleam_fields),
+      resource.resource_domain_type(type_name, gleam_fields),
     )
 
   let assert Ok(_) =
