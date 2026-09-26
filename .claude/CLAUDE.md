@@ -148,6 +148,8 @@ See [../AGENTS.md](../AGENTS.md#commands) — single source of truth for command
 | `src/mastro/jobs.gleam` | Job queue and retry policy |
 | `src/mastro/testing.gleam` | Test helpers |
 | `src/mastro/cli.gleam` | CLI entry point |
-| `src/mastro/cli/gen.gleam` | Code generators (page, resource, auth, island, live, migration) |
+| `src/mastro/cli/gen/` | One module per generator (`resource.gleam` + `resource_*` templates, `auth.gleam` + `auth_*` templates, `page`, `migration`, `island`, `live`) |
+| `src/mastro/cli/gen/router.gleam` | Every `router.gleam` patch (routes and imports) |
+| `src/mastro/cli/gen/fields.gleam` | Field type parsing and the Gleam/SQL type mapping |
 | `src/mastro/cli/templates.gleam` | File content templates |
 | `docs/GOLDEN_PATH.md` | Golden path specification |

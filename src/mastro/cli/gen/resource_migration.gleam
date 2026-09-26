@@ -5,7 +5,7 @@ import gleam/list
 import gleam/string
 import mastro/cli/gen/fields
 import mastro/cli/text
-import mastro/cli/types.{type DbChoice, NoDb, Postgres, Sqlite}
+import mastro/cli/types.{type DbChoice, Sqlite}
 
 pub fn resource_migration(
   name: String,
