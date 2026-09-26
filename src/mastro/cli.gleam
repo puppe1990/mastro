@@ -14,6 +14,7 @@ import mastro/cli/destroy
 import mastro/cli/dev
 import mastro/cli/doctor
 import mastro/cli/gen
+import mastro/cli/gen/auth as gen_auth
 import mastro/cli/gen/island as gen_island
 import mastro/cli/gen/live as gen_live
 import mastro/cli/gen/migration as gen_migration
@@ -33,7 +34,7 @@ pub fn main() {
     ["gen", "page", name, ..] -> gen_page.page(name)
     ["gen", "resource", name, ..fields] -> gen.resource(name, fields)
     ["gen", "migration", name, ..] -> gen_migration.migration(name)
-    ["gen", "auth", ..] -> gen.auth()
+    ["gen", "auth", ..] -> gen_auth.auth()
     ["gen", "island", name, ..] -> gen_island.island(name)
     ["gen", "live", name, ..] -> gen_live.live(name)
     ["gen", "component", "--list", ..] -> component.run("", ["--list"])
