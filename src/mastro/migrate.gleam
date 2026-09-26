@@ -149,8 +149,16 @@ fn number_of(filename: String) -> Int {
 
 // -- Reading ------------------------------------------------------------------
 
-/// Every migration in the directory, in numeric order.
+/// Every migration in the directory, in numeric order. A directory that does
+/// not exist yet is not an error: it means nothing has been generated.
 pub fn read_directory(dir: String) -> Result(List(Migration), String) {
+  case simplifile.is_directory(dir) {
+    Ok(False) -> Ok([])
+    _ -> read_migrations(dir)
+  }
+}
+
+fn read_migrations(dir: String) -> Result(List(Migration), String) {
   use files <- result.try(
     simplifile.read_directory(dir)
     |> result.replace_error("Could not read migrations directory: " <> dir),

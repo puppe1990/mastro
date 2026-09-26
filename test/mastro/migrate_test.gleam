@@ -183,6 +183,13 @@ INSERT INTO users (email) VALUES ('demo@example.com');",
   )
 }
 
+pub fn a_missing_migrations_dir_is_not_an_error_test() {
+  // A scaffold that has generated nothing yet has no migrations directory,
+  // and `mastro migrate` should say so rather than fail.
+  migrate.read_directory("/tmp/mastro_migrations_that_do_not_exist")
+  |> should.equal(Ok([]))
+}
+
 pub fn migrations_are_read_in_numeric_order_test() {
   in_temp_dir("order", fn(dir) {
     write(dir, "010_ten.sql", "SELECT 10;")
