@@ -3,7 +3,7 @@
 import gleam/list
 import gleam/string
 import mastro/cli/gen/fields
-import mastro/cli/templates
+import mastro/cli/templates/resource
 import mastro/cli/types.{
   type AdminAuth, type DbChoice, BearerAuth, SessionAuth, Sqlite,
 }
@@ -93,7 +93,7 @@ import " <> app_name <> "/domain/" <> resource_singular <> "
 import mastro/query
 import wisp.{type Request, type Response}" <> auth_imports <> "
 
-" <> templates.auth_guard(admin_auth, True) <> "
+" <> resource.auth_guard(admin_auth, True) <> "
 pub fn index(req: Request, ctx: Context) -> Response {
   use <- require_admin(req, ctx)
   let params = query.parse(req.query)
