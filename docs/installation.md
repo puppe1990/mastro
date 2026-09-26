@@ -40,6 +40,11 @@ export PATH="$PWD:$PATH"
 mastro help
 ```
 
+The wrapper runs the compiled CLI from the checkout while keeping your
+current directory: `mastro new my_app` creates the app where you are, and
+`mastro gen resource ...` inside an app acts on that app. Only `erl` is
+needed at run time, not `gleam`.
+
 ## Create your first project
 
 Generated apps depend on the framework source, so point them at the
