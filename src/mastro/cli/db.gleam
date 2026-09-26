@@ -5,7 +5,6 @@
 ///
 import gleam/io
 import gleam/list
-import gleam/result
 import gleam/string
 import mastro/cli/migrate_cmd
 import mastro/cli/project

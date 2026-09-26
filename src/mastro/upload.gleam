@@ -25,7 +25,6 @@
 import gleam/bit_array
 import gleam/crypto
 import gleam/list
-import gleam/result
 import gleam/string
 import simplifile
 import wisp
@@ -89,7 +88,6 @@ pub fn save(file: UploadedFile, to dest_dir: String) -> Result(String, String) {
 
   // Generate a unique filename
   let unique = generate_id()
-  let ext = get_extension(file.file_name)
   let dest_name = unique <> "_" <> sanitize_filename(file.file_name)
   let dest_path = dest_dir <> "/" <> dest_name
 
@@ -109,18 +107,6 @@ fn generate_id() -> String {
   crypto.strong_random_bytes(8)
   |> bit_array.base16_encode
   |> string.lowercase
-}
-
-/// Get the file extension from a filename.
-fn get_extension(filename: String) -> String {
-  case string.split(filename, ".") {
-    [_, ..rest] ->
-      case list.last(rest) {
-        Ok(ext) -> "." <> ext
-        Error(_) -> ""
-      }
-    _ -> ""
-  }
 }
 
 /// Remove dangerous characters from a filename.

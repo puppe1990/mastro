@@ -8,7 +8,6 @@
 /// `--dry-run` prints every change without writing.
 import gleam/io
 import gleam/list
-import gleam/result
 import gleam/string
 import mastro/cli/format
 import mastro/cli/project

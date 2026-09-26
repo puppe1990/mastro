@@ -24,8 +24,6 @@
 ///
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
-import gleam/int
-import gleam/list
 import gleam/otp/actor
 import gleam/result
 import wisp.{type Request, type Response}
@@ -72,7 +70,11 @@ pub fn start() -> Result(Metrics, actor.StartError) {
 }
 
 /// Middleware that tracks request duration and status.
-pub fn track(req: Request, metrics: Metrics, next: fn() -> Response) -> Response {
+pub fn track(
+  _req: Request,
+  metrics: Metrics,
+  next: fn() -> Response,
+) -> Response {
   let start = system_time_ms()
   let resp = next()
   let duration = system_time_ms() - start

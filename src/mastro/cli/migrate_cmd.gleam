@@ -97,7 +97,7 @@ import wisp
 }
 
 /// The commands every driver answers, once the connection has been settled.
-fn helpers(app: String) -> String {
+fn helpers(_app: String) -> String {
   "fn apply(
   execute: migrate.Execute,
   query: migrate.Query,

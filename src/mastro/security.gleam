@@ -18,7 +18,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import wisp.{type Request, type Response}
+import wisp.{type Response}
 
 /// `X-Content-Type-Options`: never let the browser guess a type.
 pub const content_type_options = "nosniff"

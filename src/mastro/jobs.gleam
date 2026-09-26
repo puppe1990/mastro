@@ -593,9 +593,16 @@ fn is_not_blank(part: String) -> Bool {
   string.trim(part) != ""
 }
 
+/// Every value from `start` to `stop`, both included — what a cron field
+/// expands to. Field bounds always run low to high.
+fn inclusive_range(start: Int, stop: Int) -> List(Int) {
+  int.range(from: start, to: stop + 1, with: [], run: list.prepend)
+  |> list.reverse
+}
+
 fn field(text: String, low: Int, high: Int) -> Result(List(Int), String) {
   case string.trim(text) {
-    "*" -> Ok(list.range(low, high))
+    "*" -> Ok(inclusive_range(low, high))
     _ -> {
       use parts <- result.try(
         text
@@ -618,7 +625,7 @@ fn part_values(part: String, low: Int, high: Int) -> Result(List(Int), String) {
   }
 
   use #(start, values) <- result.try(case string.trim(range) {
-    "*" -> Ok(#(low, list.range(low, high)))
+    "*" -> Ok(#(low, inclusive_range(low, high)))
     _ -> bounds(range, low, high)
   })
 
@@ -637,7 +644,7 @@ fn bounds(
     [start, end] ->
       case int.parse(start), int.parse(end) {
         Ok(start), Ok(end) if start >= low && end <= high && start <= end ->
-          Ok(#(start, list.range(start, end)))
+          Ok(#(start, inclusive_range(start, end)))
         _, _ -> Error("bad range: " <> range)
       }
     [single] ->

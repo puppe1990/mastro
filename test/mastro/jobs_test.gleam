@@ -4,11 +4,8 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/otp/actor
-import gleam/result
-import gleam/string
 import gleeunit/should
 import mastro/jobs.{type Job, Job}
-import mastro/jobs_ui
 import mastro/session
 
 // -- An in-memory queue -------------------------------------------------------
@@ -484,6 +481,13 @@ pub fn cron_next_handles_steps_and_lists_test() {
   // */15 fires at :15, not at the boundary it starts from.
   should.equal(jobs.cron_next("*/15 * * * *", 0), Ok(900))
   should.equal(jobs.cron_next("30 9,17 * * *", 0), Ok(34_200))
+}
+
+pub fn cron_next_handles_ranges_test() {
+  // 9-17 expands to [9..17], so the first hit is 09:00.
+  should.equal(jobs.cron_next("0 9-17 * * *", 0), Ok(32_400))
+  // An inverted range is rejected rather than silently wrapped.
+  should.be_error(jobs.cron_next("0 17-9 * * *", 0))
 }
 
 pub fn cron_next_handles_weekdays_test() {

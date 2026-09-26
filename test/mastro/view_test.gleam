@@ -1,5 +1,3 @@
-import gleam/dict
-import gleam/list
 import gleam/string
 import gleeunit/should
 import lustre/element

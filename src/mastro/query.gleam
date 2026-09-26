@@ -6,7 +6,6 @@
 //// unknown column or direction falls back to the default, never into SQL.
 
 import gleam/dict.{type Dict}
-import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result

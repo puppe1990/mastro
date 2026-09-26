@@ -2,7 +2,7 @@ import gleam/list
 import gleam/option
 import gleam/string
 import gleeunit/should
-import mastro/jobs.{type Job, Job}
+import mastro/jobs.{Job}
 import mastro/jobs_ui
 
 // -- Dashboard ----------------------------------------------------------------

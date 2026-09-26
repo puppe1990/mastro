@@ -5,7 +5,6 @@
 //// render.
 
 import gleam/dict.{type Dict}
-import gleam/list
 import gleam/string
 
 pub type Locale {
