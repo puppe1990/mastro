@@ -47,6 +47,26 @@ pub fn new_pins_a_stdlib_that_glisten_can_build_against_test() {
   })
 }
 
+pub fn new_postgres_repo_connects_with_a_user_test() {
+  in_temp_dir("new_pg_url", fn(dir) {
+    let project_dir = dir <> "/pg_url_app"
+    new.run(project_dir, ["--db", "postgres"])
+
+    // pog's url_config requires a username in the URL, and a differently
+    // configured PostgreSQL should not need a code change.
+    file_contains(
+      project_dir <> "/src/pg_url_app/data/repo.gleam",
+      "postgres://postgres@localhost:5432/pg_url_app_dev",
+    )
+    |> should.be_true
+    file_contains(
+      project_dir <> "/src/pg_url_app/data/repo.gleam",
+      "DATABASE_URL",
+    )
+    |> should.be_true
+  })
+}
+
 pub fn new_with_postgres_creates_repo_test() {
   in_temp_dir("new_pg", fn(dir) {
     let project_dir = dir <> "/pg_app"

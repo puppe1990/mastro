@@ -18,8 +18,12 @@ connects via URL:
 // src/<app>/data/repo.gleam
 pub fn connect(cfg: Config) -> Result(pog.Connection, Nil) {
   let db_url = case cfg.env {
-    config.Test -> "postgres://localhost:5432/my_app_test"
-    _ -> "postgres://localhost:5432/my_app_dev"
+    config.Test -> "postgres://postgres@localhost:5432/my_app_test"
+    _ ->
+      case envoy.get("DATABASE_URL") {
+        Ok(url) -> url
+        Error(_) -> "postgres://postgres@localhost:5432/my_app_dev"
+      }
   }
 
   let pool_name = process.new_name(prefix: "my_app_db")
