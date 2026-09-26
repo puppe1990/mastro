@@ -991,7 +991,9 @@ Gleam-in-Gleam is preferred for dogfooding and community trust.
 
 ```toml
 [dependencies]
-gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+# 0.71 removed list.range, which glisten (through mist) still calls: capped
+# until a fixed glisten ships, or a fresh app does not compile.
+gleam_stdlib = ">= 0.44.0 and < 0.71.0"
 gleam_erlang = ">= 0.34.0 and < 2.0.0"
 gleam_http = ">= 4.3.0 and < 5.0.0"
 mist = ">= 5.0.0 and < 6.0.0"

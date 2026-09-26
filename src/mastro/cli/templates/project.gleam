@@ -15,7 +15,9 @@ target = \"erlang\"
 gleam = \">= 1.14.0\"
 
 [dependencies]
-gleam_stdlib = \">= 0.44.0 and < 2.0.0\"
+# gleam_stdlib 0.71 removed list.range, which glisten (through mist) still
+# calls; lift this cap once a fixed glisten is out.
+gleam_stdlib = \">= 0.44.0 and < 0.71.0\"
 gleam_erlang = \">= 0.34.0 and < 2.0.0\"
 gleam_http = \">= 4.3.0 and < 5.0.0\"
 argv = \">= 1.0.2 and < 2.0.0\"

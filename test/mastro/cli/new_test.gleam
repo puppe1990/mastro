@@ -32,6 +32,21 @@ pub fn new_creates_project_structure_test() {
   })
 }
 
+pub fn new_pins_a_stdlib_that_glisten_can_build_against_test() {
+  in_temp_dir("new_stdlib_cap", fn(dir) {
+    let project_dir = dir <> "/cap_app"
+    new.run(project_dir, [])
+
+    // A fresh app must build out of the box: glisten 8.0.3 (through mist)
+    // still calls list.range, which gleam_stdlib 0.71.0 removed.
+    file_contains(
+      project_dir <> "/gleam.toml",
+      "gleam_stdlib = \">= 0.44.0 and < 0.71.0\"",
+    )
+    |> should.be_true
+  })
+}
+
 pub fn new_with_postgres_creates_repo_test() {
   in_temp_dir("new_pg", fn(dir) {
     let project_dir = dir <> "/pg_app"
