@@ -205,6 +205,47 @@ you never said how to undo it.
 A file marked `-- dev-only` is skipped when `APP_ENV=prod` unless the run is
 explicit — a demo user does not belong in production.
 
+### Demo seed
+
+Every generated resource carries a `seed_demo/1` in its repo: it inserts
+one row when the table is empty, and returns the row id so a child
+resource can point at it.
+
+```gleam
+pub fn seed_demo(db_path: String) -> Result(Int, Nil) {
+  case count(db_path, "") {
+    0 -> {
+      use author_id <- result.try(author_repo.seed_demo(db_path))
+      use item <-
+        result.try(
+          create(db_path, PostParams(title: "Demo Title", author_id: author_id)),
+        )
+      Ok(item.id)
+    }
+    _ -> first_id(db_path)
+  }
+}
+```
+
+The entry point runs the seed at boot in development, never in
+production:
+
+```gleam
+case config.is_development(cfg) {
+  True -> {
+    let _ = post_repo.seed_demo(db_path)
+    Nil
+  }
+  False -> Nil
+}
+```
+
+A reference seeds its parent first: the parent's own `seed_demo` when it
+has one, otherwise the first row the parent already has (the FK
+constraint would fail on a fresh database otherwise). `--no-seed` skips
+the whole thing. `mastro destroy resource` takes the line and the import
+back out of the entry point.
+
 ### Idempotent by ledger
 
 Applied migrations are recorded in `schema_migrations`, so running the same

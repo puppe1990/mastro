@@ -109,19 +109,25 @@ Every generated file looks like something a skilled Gleam developer would write 
 case wisp.path_segments(req), req.method {
   [], http.Get -> home_handler.index(req, ctx)
 
-  ["posts"], http.Get -> post_handler.index(req, ctx)
-  ["posts", "new"], http.Get -> post_handler.new(req, ctx)
-  ["posts"], http.Post -> post_handler.create(req, ctx)
-  ["posts", id], http.Get -> post_handler.show(req, ctx, id)
-  ["posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
-  ["posts", id], http.Put -> post_handler.update(req, ctx, id)
-  ["posts", id], http.Delete -> post_handler.delete(req, ctx, id)
+  ["admin", "posts"], http.Get -> post_handler.index(req, ctx)
+  ["admin", "posts", "new"], http.Get -> post_handler.new(req, ctx)
+  ["admin", "posts"], http.Post -> post_handler.create(req, ctx)
+  ["admin", "posts", id], http.Get -> post_handler.show(req, ctx, id)
+  ["admin", "posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
+  ["admin", "posts", id], http.Put -> post_handler.update(req, ctx, id)
+  ["admin", "posts", id], http.Delete -> post_handler.delete(req, ctx, id)
 
   _, _ -> error_handler.not_found(req)
 }
 ```
 
 Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file and understands every route in 30 seconds.
+
+The admin actions carry the gate the resource was generated with (`require_admin`: the session cookie `gen auth` writes, or `ADMIN_TOKEN` as a bearer token). `--public` adds the list anyone can read:
+
+```gleam
+["posts"], http.Get -> post_handler.public_index(req, ctx)
+```
 
 <br>
 
@@ -168,6 +174,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] Project scaffolding with Postgres or SQLite
 - [x] Full CRUD resource generator (handler, views, forms, domain, repo, migration, tests)
 - [x] Resource search, whitelisted sort and pagination (`mastro/query`), foreign keys via `:references`
+- [x] Admin index built from the kit (`filters`, `table`, `empty`, `pagination`), a session or bearer admin gate, a public list (`--public`) and a demo seed at boot (`--no-seed`)
 - [x] JSON API mode (`--api` flag, routes under `/api/`)
 - [x] Authentication generator (login, register, logout, sessions, middleware)
 - [x] Lustre interactive islands (`gen island`)
@@ -185,7 +192,7 @@ Plain Gleam pattern matching. No DSL, no macros. A new developer reads this file
 - [x] Dev file watcher (auto-rebuild on `src/` changes via fswatch)
 - [x] Auto-format all generated code
 - [x] Route table printer
-- [x] 21 tests (12 unit + 9 integration)
+- [x] 285 tests (unit + generator integration)
 - [x] 17 documentation files
 - [x] 2 example apps (blog + tasks)
 
@@ -265,7 +272,7 @@ mise install   # Gleam 1.14, Erlang 27, rebar3
 
 # Build and test
 gleam build
-gleam test     # 21 tests
+gleam test     # 285 tests
 ```
 
 <br>

@@ -14,8 +14,8 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req), req.method {
     [], http.Get -> home_handler.index(req, ctx)
-    ["posts"], http.Get -> post_handler.index(req, ctx)
-    ["posts", id], http.Get -> post_handler.show(req, ctx, id)
+    ["posts"], http.Get -> post_handler.public_index(req, ctx)
+    ["admin", "posts", id], http.Get -> post_handler.show(req, ctx, id)
     _, _ -> error_handler.not_found(req)
   }
 }
@@ -24,19 +24,19 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 `wisp.path_segments(req)` splits the URL path into a list of strings:
 - `/` → `[]`
 - `/posts` → `["posts"]`
-- `/posts/42` → `["posts", "42"]`
-- `/posts/42/edit` → `["posts", "42", "edit"]`
+- `/admin/posts/42` → `["admin", "posts", "42"]`
+- `/admin/posts/42/edit` → `["admin", "posts", "42", "edit"]`
 
 ## Route parameters
 
 Variables in the pattern become handler arguments:
 
 ```gleam
-// /posts/42 → id = "42"
-["posts", id], http.Get -> post_handler.show(req, ctx, id)
+// /admin/posts/42 → id = "42"
+["admin", "posts", id], http.Get -> post_handler.show(req, ctx, id)
 
-// /posts/42/edit → id = "42"
-["posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
+// /admin/posts/42/edit → id = "42"
+["admin", "posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
 ```
 
 Route parameters are always strings. Parse them in the handler:
@@ -52,20 +52,54 @@ pub fn show(req: Request, ctx: Context, id: String) -> Response {
 
 ## RESTful resource routes
 
-`mastro gen resource posts ...` adds these routes:
+`mastro gen resource posts ...` adds these admin routes:
 
 ```gleam
-["posts"], http.Get -> post_handler.index(req, ctx)
-["posts", "new"], http.Get -> post_handler.new(req, ctx)
-["posts"], http.Post -> post_handler.create(req, ctx)
-["posts", id], http.Get -> post_handler.show(req, ctx, id)
-["posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
-["posts", id], http.Put -> post_handler.update(req, ctx, id)
-["posts", id], http.Delete -> post_handler.delete(req, ctx, id)
+["admin", "posts"], http.Get -> post_handler.index(req, ctx)
+["admin", "posts", "new"], http.Get -> post_handler.new(req, ctx)
+["admin", "posts"], http.Post -> post_handler.create(req, ctx)
+["admin", "posts", id], http.Get -> post_handler.show(req, ctx, id)
+["admin", "posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
+["admin", "posts", id], http.Put -> post_handler.update(req, ctx, id)
+["admin", "posts", id], http.Delete -> post_handler.delete(req, ctx, id)
 ```
 
-Note: `["posts", "new"]` comes before `["posts", id]` so the literal
-`"new"` matches first and doesn't get captured as an id.
+Note: `["admin", "posts", "new"]` comes before `["admin", "posts", id]`
+so the literal `"new"` matches first and doesn't get captured as an id.
+
+## The admin gate
+
+Every admin action starts with the gate the resource was generated with
+(`--admin-auth`, `session` by default):
+
+```gleam
+pub fn index(req: Request, ctx: Context) -> Response {
+  use <- require_admin(req, ctx)
+  // ...
+}
+```
+
+- `session` reads the signed `_user_id` cookie `mastro gen auth` writes
+  and sends an anonymous visitor to `/login`. Swap in
+  `auth.require_auth` when the handler needs the user row.
+- `bearer` compares `ADMIN_TOKEN` with an `Authorization: Bearer`
+  header (`mastro/security.bearer_authorized`). An unset token opens the
+  gate in development; production refuses to boot without one, so the
+  gate only closes there. `--admin-auth bearer` flips
+  `admin_routes: True` in `config.validate/1` for you.
+
+`--public` adds the list anyone can read, without the gate:
+
+```gleam
+["posts"], http.Get -> post_handler.public_index(req, ctx)
+```
+
+## The public list
+
+`--public` renders `public_index_view`: `<.filters>` on the display
+field, `<.empty>` when the search finds nothing and `<.pagination
+base>` when there is more than one page. No admin links, no table
+headers to sort by — the sort whitelist belongs to the admin index.
 
 ## Method override
 
@@ -73,7 +107,7 @@ HTML forms only support GET and POST. To send PUT and DELETE, Mastro
 uses method override — a hidden form field `_method`:
 
 ```html
-<form method="post" action="/posts/42">
+<form method="post" action="/admin/posts/42">
   <input type="hidden" name="_method" value="put">
   <!-- form fields -->
 </form>
@@ -137,11 +171,18 @@ Output:
 
 ```
 GET     /                   home_handler.index
-GET     /posts              post_handler.index
-GET     /posts/new          post_handler.new
-POST    /posts              post_handler.create
-GET     /posts/:id          post_handler.show
-GET     /posts/:id/edit     post_handler.edit
-PUT     /posts/:id          post_handler.update
-DELETE  /posts/:id          post_handler.delete
+GET     /admin/posts        post_handler.index
+GET     /admin/posts/new    post_handler.new
+POST    /admin/posts        post_handler.create
+GET     /admin/posts/:id    post_handler.show
+GET     /admin/posts/:id/edit post_handler.edit
+PUT     /admin/posts/:id    post_handler.update
+DELETE  /admin/posts/:id    post_handler.delete
+```
+
+A resource generated with `--public` also lists the page anyone can
+read:
+
+```
+GET     /posts              post_handler.public_index
 ```

@@ -83,14 +83,14 @@ mastro routes
 ```
 
 ```
-GET     /                   home_handler.index
-GET     /posts              post_handler.index
-GET     /posts/new          post_handler.new
-POST    /posts              post_handler.create
-GET     /posts/:id          post_handler.show
-GET     /posts/:id/edit     post_handler.edit
-PUT     /posts/:id          post_handler.update
-DELETE  /posts/:id          post_handler.delete
+GET     /                     home_handler.index
+GET     /admin/posts          post_handler.index
+GET     /admin/posts/new      post_handler.new
+POST    /admin/posts          post_handler.create
+GET     /admin/posts/:id      post_handler.show
+GET     /admin/posts/:id/edit post_handler.edit
+PUT     /admin/posts/:id      post_handler.update
+DELETE  /admin/posts/:id      post_handler.delete
 ```
 
 ## 4. Run the migration
@@ -105,8 +105,10 @@ psql blog_dev < src/blog/data/migrations/001_create_posts.sql
 gleam run
 ```
 
-Visit http://localhost:4000/posts — you'll see the posts index.
-Click "New Post" to create one.
+Visit http://localhost:4000/admin/posts — you'll see the posts index,
+seeded with a demo row in development. Click "New Post" to create one.
+The admin routes are gated; run `mastro gen auth` for the `/login` page
+the default session gate sends an anonymous visitor to.
 
 ## 6. Look at the generated code
 
@@ -116,13 +118,13 @@ Open `src/blog/router.gleam`:
 case wisp.path_segments(req), req.method {
   [], http.Get -> home_handler.index(req, ctx)
 
-  ["posts"], http.Get -> post_handler.index(req, ctx)
-  ["posts", "new"], http.Get -> post_handler.new(req, ctx)
-  ["posts"], http.Post -> post_handler.create(req, ctx)
-  ["posts", id], http.Get -> post_handler.show(req, ctx, id)
-  ["posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
-  ["posts", id], http.Put -> post_handler.update(req, ctx, id)
-  ["posts", id], http.Delete -> post_handler.delete(req, ctx, id)
+  ["admin", "posts"], http.Get -> post_handler.index(req, ctx)
+  ["admin", "posts", "new"], http.Get -> post_handler.new(req, ctx)
+  ["admin", "posts"], http.Post -> post_handler.create(req, ctx)
+  ["admin", "posts", id], http.Get -> post_handler.show(req, ctx, id)
+  ["admin", "posts", id, "edit"], http.Get -> post_handler.edit(req, ctx, id)
+  ["admin", "posts", id], http.Put -> post_handler.update(req, ctx, id)
+  ["admin", "posts", id], http.Delete -> post_handler.delete(req, ctx, id)
 
   _, _ -> error_handler.not_found(req)
 }
@@ -208,20 +210,25 @@ POST    /logout             auth_handler.logout
 
 ## 8. Protect a route
 
-Open `src/blog/web/post_handler.gleam` and add auth to the create action:
+The admin actions already carry the gate the generator wrote: every one
+starts with `use <- require_admin(req, ctx)`, which reads the signed
+`_user_id` cookie and sends an anonymous visitor to `/login` — the page
+`gen auth` just created.
+
+When a handler needs the user row itself, use `auth.require_auth`:
 
 ```gleam
 import blog/web/middleware/auth
 
 pub fn create(req: Request, ctx: Context) -> Response {
-  use _user <- auth.require_auth(req, ctx)
-  use form_data <- wisp.require_form(req)
+  use user <- auth.require_auth(req, ctx)
   // ... rest of create logic
 }
 ```
 
-Now only logged-in users can create posts. The `require_auth` middleware
-redirects to `/login` if there's no session.
+The `require_auth` middleware redirects to `/login` if there's no
+session. `--admin-auth bearer` switches the generated gate to
+`ADMIN_TOKEN` in an `Authorization: Bearer` header instead.
 
 ## 9. Add a page
 

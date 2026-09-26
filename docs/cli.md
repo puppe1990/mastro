@@ -52,8 +52,8 @@ mastro gen resource posts title:string body:text --api
 ```
 
 **Creates (HTML mode):**
-- Handler (7 actions: index, show, new, create, edit, update, delete)
-- Views (list, detail, form with proper field types)
+- Handler (7 admin actions: index, show, new, create, edit, update, delete)
+- Views (admin index, detail, form with proper field types)
 - Form decoder with validation
 - Domain type
 - Database repo (Pog or Sqlight, auto-detected)
@@ -68,8 +68,10 @@ mastro gen resource posts title:string body:text --api
 - SQL migration
 - Tests
 
-**Patches:** `router.gleam` with RESTful routes (HTML: 7 routes,
-API: 5 routes under `/api/` prefix).
+**Patches:** `router.gleam` with the admin routes under `/admin/`
+(HTML: 7 routes, API: 5 under `/api/`), plus the public list with
+`--public`. `src/<app>.gleam` gets the demo seed at boot when there is
+one, and `config.gleam` flips the production gate for a bearer admin.
 
 **Field types:** See [Field Types](field-types.md).
 
@@ -82,20 +84,58 @@ mastro gen resource posts title:string author:references
 # author_id INTEGER NOT NULL REFERENCES authors(id)
 ```
 
+A reference is not a sort target (sorting by an id is not a feature), and
+the demo seed makes sure the parent row exists first — it calls the
+parent's own `seed_demo` when it ships one, and reuses the first row it
+already has otherwise.
+
 **Flags:**
 
 | Flag | Effect |
 |------|--------|
 | `--api` | JSON API mode (no views/forms, routes under `/api/`) |
-| `--public` | Public list (no admin gate) |
+| `--public` | Add the public list at `/<plural>` (no gate) |
 | `--paginate` | 25 rows per page with `<.pagination>` |
 | `--no-seed` | Skip the demo seed |
-| `--admin-auth session\|bearer` | Admin auth for the resource (default `session`) |
+| `--admin-auth session\|bearer` | Gate for the admin routes (default `session`) |
 
-**Index:** the generated `list/5` takes `(search, sort, dir, page)`.
-`search` is a `LIKE` on the display field, `sort` is only honoured for
-whitelisted columns (anything else — including a bad direction — falls
-back safely via `mastro/query`), and `page` is 25 rows.
+**Admin auth:** every admin action starts with `require_admin/3`,
+generated for the mode you asked for. `session` reads the signed
+`_user_id` cookie `mastro gen auth` writes and redirects an anonymous
+visitor to `/login`; `bearer` compares `ADMIN_TOKEN` with an
+`Authorization: Bearer` header — an unset token opens the gate in
+development, and production refuses to boot without it. See
+[Authentication](authentication.md).
+
+**Index:** the generated `list/5` takes `(search, sort, dir, page)` and
+`count/2` returns the matching rows. `search` is a `LIKE` on the display
+field, `sort` is only honoured for whitelisted columns (anything else —
+including a bad direction — falls back safely via `mastro/query`), and
+`page` is 25 rows. The admin view renders the kit: `kit.filters` (the `q`
+search, with `sort`/`dir` kept in hidden inputs), `kit.table` (sortable
+headers linking `?sort=&dir=`, each marked with `aria-sort`),
+`kit.empty_state`, and `kit.pagination` — the link base carries the
+filter, so paging does not lose the search.
+
+**Demo seed:** each repo gets a `seed_demo/1` that inserts one row when
+the table is empty (idempotent) and returns its id, so a child resource
+can reference the parent row it just made. The entry point runs it at
+boot in development only, never in production:
+
+```gleam
+case config.is_development(cfg) {
+  True -> {
+    let _ = post_repo.seed_demo(db_path)
+    Nil
+  }
+  False -> Nil
+}
+```
+
+`--no-seed` skips the function, the boot call and the parent it would
+have seeded. A reference whose parent resource was never generated has
+no repo to call: the generator skips the demo seed and says so instead
+of writing code that does not compile.
 
 **Naming:** The resource name should be plural (`posts`, not `post`).
 The generator singularizes it for types (`Post`) and file names
