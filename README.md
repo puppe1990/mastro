@@ -49,26 +49,27 @@ Light enters a prism, structure emerges. Mastro takes the Gleam ecosystem — [W
 ## Quick Start
 
 ```bash
-# Add mastro to a Gleam project (or use it standalone)
-gleam add mastro
+# 1. Get the framework (not on Hex yet)
+git clone https://github.com/puppe1990/mastro.git
+cd mastro && ./bin/build-cli.sh && export PATH="$PWD:$PATH"
 
-# Create a new project with PostgreSQL
-gleam run -m mastro/cli -- new my_app --db postgres
+# 2. Create a project next to the checkout
+cd .. && mastro new my_app --db postgres
 cd my_app
 
-# Generate a full CRUD resource
-gleam run -m mastro/cli -- gen resource posts title:string body:text published:bool
-
-# Start the server
+# 3. Point it at the local framework and run
+mastro link ../mastro
 gleam run
-# → http://localhost:4000/posts
+# → http://localhost:4000
 ```
 
 Or with SQLite — no external database needed:
 
 ```bash
-gleam run -m mastro/cli -- new my_app --db sqlite
+mastro new my_app --db sqlite
 ```
+
+See [Installation](docs/installation.md) for details.
 
 <br>
 

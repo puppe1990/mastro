@@ -7,7 +7,7 @@ about page — all running on Gleam.
 **Prerequisites:**
 - Gleam 1.14+ and Erlang/OTP 27+
 - PostgreSQL running locally
-- `mastro` published on Hex (or use a path dependency for now)
+- A local `mastro` checkout (it is not on Hex yet — see [Installation](installation.md))
 
 **Time:** ~10 minutes
 
@@ -18,6 +18,7 @@ about page — all running on Gleam.
 ```bash
 mastro new blog --db postgres
 cd blog
+mastro link ../mastro    # point at the local framework checkout
 ```
 
 This creates a complete project structure:
