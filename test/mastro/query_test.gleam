@@ -31,6 +31,21 @@ pub fn parse_keeps_a_key_without_a_value_test() {
   |> should.equal(dict.from_list([#("flag", "")]))
 }
 
+pub fn url_encodes_the_params_that_survive_a_link_test() {
+  query.url("/posts", [#("q", "hello world"), #("sort", "title")])
+  |> should.equal("/posts?q=hello%20world&sort=title")
+}
+
+pub fn url_drops_empty_values_test() {
+  query.url("/posts", [#("q", ""), #("sort", "title"), #("dir", "")])
+  |> should.equal("/posts?sort=title")
+}
+
+pub fn url_without_params_is_the_path_test() {
+  query.url("/posts", []) |> should.equal("/posts")
+  query.url("/posts", [#("q", "")]) |> should.equal("/posts")
+}
+
 pub fn order_by_accepts_a_whitelisted_column_test() {
   query.order_by("title", "desc", allowed, "id")
   |> should.equal("ORDER BY title desc")
