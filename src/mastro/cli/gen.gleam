@@ -6,9 +6,13 @@ import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
+import mastro/cli/files
 import mastro/cli/format
+import mastro/cli/gen/options
+import mastro/cli/gen/source
 import mastro/cli/project
 import mastro/cli/templates
+import mastro/cli/text
 import mastro/cli/types.{
   type AdminAuth, type DbChoice, BearerAuth, NoDb, Postgres, SessionAuth, Sqlite,
 }
@@ -16,44 +20,6 @@ import simplifile
 
 /// The comment the demo seed block in the entry point carries.
 const demo_seed_marker = "  // Demo data for development"
-
-/// Flags that change what a generated resource ships.
-pub type ResourceOptions {
-  ResourceOptions(
-    public: Bool,
-    paginate: Bool,
-    seed: Bool,
-    admin_auth: AdminAuth,
-  )
-}
-
-fn parse_resource_options(args: List(String)) -> ResourceOptions {
-  ResourceOptions(
-    public: list.contains(args, "--public"),
-    paginate: list.contains(args, "--paginate"),
-    seed: !list.contains(args, "--no-seed"),
-    admin_auth: parse_admin_auth(extract_flag_value(args, "--admin-auth")),
-  )
-}
-
-fn parse_admin_auth(value: Result(String, Nil)) -> AdminAuth {
-  case value {
-    Ok("bearer") -> BearerAuth
-    Ok("session") -> SessionAuth
-    Ok(other) -> {
-      io.println("Unknown --admin-auth " <> other <> ", using session.")
-      SessionAuth
-    }
-    Error(_) -> SessionAuth
-  }
-}
-
-fn auth_label(auth: AdminAuth) -> String {
-  case auth {
-    SessionAuth -> "session"
-    BearerAuth -> "bearer"
-  }
-}
 
 // =============================================================================
 // gen page
@@ -75,9 +41,9 @@ import wisp.{type Request, type Response}
 
 pub fn index(req: Request, _ctx: Context) -> Response {
   section([class(\"" <> name <> "\")], [
-    h1([], [text(\"" <> capitalize(name) <> "\")]),
+    h1([], [text(\"" <> text.capitalize(name) <> "\")]),
   ])
-  |> root_layout.wrap(\"" <> capitalize(name) <> "\", req)
+  |> root_layout.wrap(\"" <> text.capitalize(name) <> "\", req)
   |> wisp.html_response(200)
 }
 "
@@ -92,7 +58,7 @@ pub fn placeholder_test() {
 "
 
   let assert Ok(_) = simplifile.write(handler_path, handler_content)
-  ensure_dir_for(test_path)
+  files.ensure_dir_for(test_path)
   let assert Ok(_) = simplifile.write(test_path, test_content)
 
   // Patch router and format
@@ -117,11 +83,11 @@ pub fn resource(name: String, raw_args: List(String)) {
   let app = project.app_name()
   let db = project.detect_db()
   let api_mode = list.contains(raw_args, "--api")
-  let options = parse_resource_options(raw_args)
-  let belongs_to = extract_flag_value(raw_args, "--belongs-to")
+  let options = options.parse_resource_options(raw_args)
+  let belongs_to = options.flag_value(raw_args, "--belongs-to")
   let raw_fields = list.filter(raw_args, fn(a) { !string.starts_with(a, "--") })
-  let singular = singularize(name)
-  let type_name = capitalize(singular)
+  let singular = text.singularize(name)
+  let type_name = text.capitalize(singular)
 
   // `field:references` and `field:belongs_to` become `<field>_id` columns
   // backed by a foreign key; `--belongs-to` is the older single-FK spelling.
@@ -130,12 +96,12 @@ pub fn resource(name: String, raw_args: List(String)) {
     parsed
     |> list.filter_map(fn(f) {
       case f.1 {
-        "references" | "belongs_to" -> Ok(singularize(f.0))
+        "references" | "belongs_to" -> Ok(text.singularize(f.0))
         _ -> Error(Nil)
       }
     })
     |> list.append(case belongs_to {
-      Ok(parent) -> [singularize(parent)]
+      Ok(parent) -> [text.singularize(parent)]
       Error(_) -> []
     })
 
@@ -348,10 +314,9 @@ pub fn resource(name: String, raw_args: List(String)) {
   io.println("Updated:")
   list.each([router_path, ..wired_paths], fn(path) { io.println("  " <> path) })
   io.println("")
-  io.println("Flags: " <> describe_options(options))
-  io.println(
-    "Admin: /admin/" <> name <> " (" <> auth_label(options.admin_auth) <> ")",
-  )
+  io.println("Flags: " <> options.describe_options(options))
+  let admin_auth = options.auth_label(options.admin_auth)
+  io.println("Admin: /admin/" <> name <> " (" <> admin_auth <> ")")
   case options.public {
     True -> io.println("Public: /" <> name)
     False -> Nil
@@ -471,25 +436,6 @@ fn patch_config_admin_routes(app: String) -> List(String) {
       [path]
     }
   }
-}
-
-fn describe_options(options: ResourceOptions) -> String {
-  let parts = [
-    case options.public {
-      True -> "public"
-      False -> "admin"
-    },
-    case options.paginate {
-      True -> "paginate"
-      False -> "no-paginate"
-    },
-    case options.seed {
-      True -> "seed"
-      False -> "no-seed"
-    },
-    "admin-auth=" <> auth_label(options.admin_auth),
-  ]
-  string.join(parts, ", ")
 }
 
 // =============================================================================
@@ -621,7 +567,7 @@ pub fn live(name: String) {
 }
 
 fn live_component(_app: String, name: String) -> String {
-  let type_name = capitalize(name)
+  let type_name = text.capitalize(name)
 
   "/// " <> type_name <> " — a Lustre server component.
 ///
@@ -757,7 +703,7 @@ pub fn upgrade(
 }
 
 fn live_handler(app: String, name: String) -> String {
-  let type_name = capitalize(name)
+  let type_name = text.capitalize(name)
 
   "/// Handler for the " <> name <> " live page.
 ///
@@ -1071,7 +1017,7 @@ fn resource_views(
   references: List(String),
   sortable: List(String),
   display_field: String,
-  options: ResourceOptions,
+  options: options.ResourceOptions,
 ) -> String {
   let first_field = case fields {
     [#(name, _), ..] -> name
@@ -1083,7 +1029,7 @@ fn resource_views(
     fields
     |> list.map(fn(f) {
       let #(fname, ftype) = f
-      let label_text = field_label(fname)
+      let label_text = source.field_label(fname)
       case ftype {
         "bool" -> "      div([class(\"field\")], [
         label([], [
@@ -1135,9 +1081,9 @@ fn resource_views(
       "    kit.Column(field: \""
       <> fname
       <> "\", label: \""
-      <> field_label(fname)
+      <> source.field_label(fname)
       <> "\", sortable: "
-      <> bool_literal(list.contains(sortable, fname))
+      <> source.bool_literal(list.contains(sortable, fname))
       <> "),"
     })
     |> string.join("\n")
@@ -1146,7 +1092,7 @@ fn resource_views(
     fields
     |> list.index_map(fn(f, index) {
       let #(fname, ftype) = f
-      let value = field_to_text(ftype, "item." <> fname)
+      let value = source.field_to_text(ftype, "item." <> fname)
       let content = case index {
         0 ->
           "a([href(\""
@@ -1173,9 +1119,9 @@ fn resource_views(
     |> list.map(fn(f) {
       let #(fname, ftype) = f
       "            html.span([], [text(\""
-      <> field_label(fname)
+      <> source.field_label(fname)
       <> ": \"), text("
-      <> field_to_text(ftype, "item." <> fname)
+      <> source.field_to_text(ftype, "item." <> fname)
       <> ")]),"
     })
     |> string.join("\n")
@@ -1189,7 +1135,7 @@ fn resource_views(
   }
 
   let display_text = case list.find(fields, fn(f) { f.0 == display_field }) {
-    Ok(#(_, ftype)) -> field_to_text(ftype, "item." <> display_field)
+    Ok(#(_, ftype)) -> source.field_to_text(ftype, "item." <> display_field)
     Error(_) -> "int.to_string(item.id)"
   }
 
@@ -1449,7 +1395,7 @@ fn resource_form(
       <> ", \""
       <> name
       <> "\", \""
-      <> capitalize(name)
+      <> text.capitalize(name)
       <> " is required\")"
     })
     |> string.join("\n")
@@ -1717,7 +1663,7 @@ fn seed_value(field_type: String, field_name: String) -> String {
     "bool" -> "True"
     "date" -> "\"2026-01-01\""
     "datetime" -> "\"2026-01-01T00:00:00Z\""
-    _ -> "\"Demo " <> capitalize(field_name) <> "\""
+    _ -> "\"Demo " <> text.capitalize(field_name) <> "\""
   }
 }
 
@@ -2460,7 +2406,7 @@ fn resource_migration(
     })
     |> string.join(",\n")
 
-  let table = singularize(name) <> "s"
+  let table = text.singularize(name) <> "s"
 
   case db {
     Sqlite -> "-- up
@@ -2592,7 +2538,7 @@ fn patch_router_resource(
   app: String,
   plural: String,
   singular: String,
-  options: ResourceOptions,
+  options: options.ResourceOptions,
 ) {
   let router_path = "src/" <> app <> "/router.gleam"
   let assert Ok(content) = simplifile.read(router_path)
@@ -3260,63 +3206,6 @@ fn patch_router_auth(app: String) {
 // String helpers
 // =============================================================================
 
-fn capitalize(s: String) -> String {
-  case string.pop_grapheme(s) {
-    Ok(#(first, rest)) -> string.uppercase(first) <> rest
-    Error(_) -> s
-  }
-}
-
-/// A column label: `author_id` is the Author.
-fn field_label(field_name: String) -> String {
-  case string.ends_with(field_name, "_id") {
-    True -> capitalize(string.drop_end(field_name, 3))
-    False -> capitalize(field_name)
-  }
-}
-
-/// Gleam source that renders a field as text in the index.
-fn field_to_text(field_type: String, value: String) -> String {
-  case field_type {
-    "int" -> "int.to_string(" <> value <> ")"
-    "float" -> "float.to_string(" <> value <> ")"
-    "bool" -> "bool.to_string(" <> value <> ")"
-    _ -> value
-  }
-}
-
-fn bool_literal(value: Bool) -> String {
-  case value {
-    True -> "True"
-    False -> "False"
-  }
-}
-
-fn extract_flag_value(args: List(String), flag: String) -> Result(String, Nil) {
-  case args {
-    [] -> Error(Nil)
-    [f, value, ..] if f == flag -> Ok(value)
-    [_, ..rest] -> extract_flag_value(rest, flag)
-  }
-}
-
-fn singularize(s: String) -> String {
-  // Simple singularization: drop trailing 's'
-  // Handles: posts -> post, users -> user, categories -> categorie (good enough for MVP)
-  case string.ends_with(s, "ies") {
-    True -> string.drop_end(s, 3) <> "y"
-    False ->
-      case string.ends_with(s, "ses") {
-        True -> string.drop_end(s, 2)
-        False ->
-          case string.ends_with(s, "s") {
-            True -> string.drop_end(s, 1)
-            False -> s
-          }
-      }
-  }
-}
-
 fn next_migration_number(app: String) -> String {
   let dir = "src/" <> app <> "/data/migrations"
   case simplifile.read_directory(dir) {
@@ -3334,19 +3223,5 @@ fn pad_number(n: Int, width: Int) -> String {
   case padding > 0 {
     True -> string.repeat("0", padding) <> s
     False -> s
-  }
-}
-
-fn ensure_dir_for(path: String) {
-  case string.split(path, "/") {
-    [] -> Nil
-    parts -> {
-      let dir =
-        parts
-        |> list.take(list.length(parts) - 1)
-        |> string.join("/")
-      let _ = simplifile.create_directory_all(dir)
-      Nil
-    }
   }
 }

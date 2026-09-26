@@ -12,6 +12,7 @@ import gleam/result
 import gleam/string
 import mastro/cli/format
 import mastro/cli/project
+import mastro/cli/text
 import simplifile
 
 pub fn run(kind: String, name: String, flags: List(String)) {
@@ -32,7 +33,7 @@ pub fn run(kind: String, name: String, flags: List(String)) {
 }
 
 fn destroy_resource(app: String, plural: String, dry_run: Bool) {
-  let singular = singularize(plural)
+  let singular = text.singularize(plural)
   [
     "src/" <> app <> "/web/" <> singular <> "_handler.gleam",
     "src/" <> app <> "/web/" <> singular <> "_views.gleam",
@@ -144,7 +145,7 @@ fn destroy_auth(app: String, dry_run: Bool) {
 /// prefix is kept (`001_add_email.sql`); otherwise both `_posts.sql` and
 /// `_post.sql` match, so a resource finds its `create_` migration.
 fn remove_migrations(app: String, name: String, exact: Bool, dry_run: Bool) {
-  let singular = singularize(name)
+  let singular = text.singularize(name)
   let dir = "src/" <> app <> "/data/migrations"
 
   case simplifile.get_files(dir) {
@@ -231,20 +232,5 @@ fn drop_pattern_line(kept: List(String)) -> List(String) {
         False -> kept
       }
     [] -> kept
-  }
-}
-
-pub fn singularize(word: String) -> String {
-  case string.ends_with(word, "ies") {
-    True -> string.drop_end(word, 3) <> "y"
-    False ->
-      case string.ends_with(word, "ses") {
-        True -> string.drop_end(word, 2)
-        False ->
-          case string.ends_with(word, "s") {
-            True -> string.drop_end(word, 1)
-            False -> word
-          }
-      }
   }
 }
