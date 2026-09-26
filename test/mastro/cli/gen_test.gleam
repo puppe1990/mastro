@@ -10,11 +10,11 @@ import gleam/string
 import gleeunit/should
 import mastro/cli/component
 import mastro/cli/destroy
-import mastro/cli/gen
 import mastro/cli/gen/auth as gen_auth
 import mastro/cli/gen/island as gen_island
 import mastro/cli/gen/migration as gen_migration
 import mastro/cli/gen/page as gen_page
+import mastro/cli/gen/resource as gen_resource
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
@@ -275,7 +275,7 @@ pub fn destroy_resource_removes_files_and_routes_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
     file_exists("src/dest_app/web/post_handler.gleam") |> should.be_true
 
     destroy.run("resource", "posts", [])
@@ -301,7 +301,7 @@ pub fn destroy_dry_run_writes_nothing_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
     let assert Ok(before) = simplifile.read("src/dry_app/router.gleam")
 
     destroy.run("resource", "posts", ["--dry-run"])
@@ -361,7 +361,7 @@ pub fn resource_reference_adds_foreign_key_and_options_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "author:references"])
+    gen_resource.resource("posts", ["title:string", "author:references"])
 
     file_contains(
       "src/fk_app/data/migrations/001_create_posts.sql",
@@ -395,8 +395,8 @@ pub fn gen_resource_seeds_the_parent_resource_first_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("authors", ["name:string"])
-    gen.resource("posts", ["title:string", "author:references"])
+    gen_resource.resource("authors", ["name:string"])
+    gen_resource.resource("posts", ["title:string", "author:references"])
 
     // The FK constraint fails on a fresh database unless the parent row is
     // there first.
@@ -429,8 +429,8 @@ pub fn gen_resource_seeds_an_existing_parent_when_it_has_no_seed_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("users", ["name:string", "--no-seed"])
-    gen.resource("posts", ["title:string", "user:references"])
+    gen_resource.resource("users", ["name:string", "--no-seed"])
+    gen_resource.resource("posts", ["title:string", "user:references"])
 
     file_contains(
       "src/fb_app/data/post_repo.gleam",
@@ -453,7 +453,7 @@ pub fn gen_resource_without_the_parent_repo_skips_the_demo_seed_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "author:references"])
+    gen_resource.resource("posts", ["title:string", "author:references"])
 
     // Nothing to call: the seed would not compile, so it is skipped.
     file_contains("src/orphan_app/data/post_repo.gleam", "seed_demo")
@@ -482,7 +482,7 @@ pub fn gen_resource_index_uses_the_kit_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "author:references"])
+    gen_resource.resource("posts", ["title:string", "author:references"])
 
     let views = "src/kit_app/web/post_views.gleam"
     file_contains(views, "import mastro/kit") |> should.be_true
@@ -531,7 +531,7 @@ pub fn gen_resource_admin_routes_are_gated_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
 
     let router = "src/gate_app/router.gleam"
     file_contains(router, "[\"admin\", \"posts\"]") |> should.be_true
@@ -559,7 +559,7 @@ pub fn gen_resource_bearer_admin_auth_flips_the_boot_gate_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "--admin-auth", "bearer"])
+    gen_resource.resource("posts", ["title:string", "--admin-auth", "bearer"])
 
     let handler = "src/bearer_app/web/post_handler.gleam"
     file_contains(handler, "security.bearer_authorized(") |> should.be_true
@@ -583,7 +583,7 @@ pub fn gen_resource_public_adds_the_public_list_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "--public"])
+    gen_resource.resource("posts", ["title:string", "--public"])
 
     file_contains(
       "src/pub_app/router.gleam",
@@ -614,7 +614,7 @@ pub fn gen_resource_seeds_a_demo_row_at_boot_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
 
     let repo = "src/seed_app/data/post_repo.gleam"
     file_contains(repo, "pub fn seed_demo(db_path: String) -> Result(Int, Nil)")
@@ -641,7 +641,7 @@ pub fn gen_resource_no_seed_skips_the_demo_seed_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "--no-seed"])
+    gen_resource.resource("posts", ["title:string", "--no-seed"])
 
     let repo = "src/noseed_app/data/post_repo.gleam"
     file_contains(repo, "seed_demo") |> should.be_false
@@ -664,7 +664,11 @@ pub fn gen_resource_creates_all_files_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string", "body:text", "published:bool"])
+    gen_resource.resource("posts", [
+      "title:string",
+      "body:text",
+      "published:bool",
+    ])
 
     // Verify files exist
     file_exists("src/res_app/web/post_handler.gleam") |> should.be_true
@@ -707,8 +711,8 @@ pub fn gen_two_resources_no_duplication_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
-    gen.resource("comments", ["body:text"])
+    gen_resource.resource("posts", ["title:string"])
+    gen_resource.resource("comments", ["body:text"])
 
     // Both handlers exist
     file_exists("src/two_app/web/post_handler.gleam") |> should.be_true
@@ -853,7 +857,7 @@ pub fn resource_migration_carries_its_own_rollback_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
 
     let path = "src/roll_app/data/migrations/001_create_posts.sql"
     file_contains(path, "-- up") |> should.be_true
@@ -872,7 +876,7 @@ pub fn sqlite_resource_repo_routes_through_the_logging_helper_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.resource("posts", ["title:string"])
+    gen_resource.resource("posts", ["title:string"])
 
     file_contains("src/sql_app/data/repo.gleam", "pub fn query(")
     |> should.be_true

@@ -1,38 +1,26 @@
-/// Code generators: page, resource, migration, auth.
+/// `gen resource <name> <fields...>` — CRUD files, routes and demo seed.
 ///
-import gleam/dict
 import gleam/io
 import gleam/list
 import gleam/string
 import mastro/cli/format
+import mastro/cli/gen/demo_seed
 import mastro/cli/gen/fields
-import mastro/cli/gen/gleam_file
 import mastro/cli/gen/migration
 import mastro/cli/gen/options
 import mastro/cli/gen/resource_api
 import mastro/cli/gen/resource_form
 import mastro/cli/gen/resource_migration
-import mastro/cli/gen/resource_references
 import mastro/cli/gen/resource_repo
 import mastro/cli/gen/resource_seed
 import mastro/cli/gen/resource_tests
 import mastro/cli/gen/resource_views
 import mastro/cli/gen/router
-import mastro/cli/gen/source
 import mastro/cli/project
 import mastro/cli/templates
 import mastro/cli/text
-import mastro/cli/types.{
-  type AdminAuth, type DbChoice, BearerAuth, NoDb, Postgres, SessionAuth, Sqlite,
-}
+import mastro/cli/types.{BearerAuth, SessionAuth}
 import simplifile
-
-/// The comment the demo seed block in the entry point carries.
-const demo_seed_marker = "  // Demo data for development"
-
-// =============================================================================
-// gen resource
-// =============================================================================
 
 pub fn resource(name: String, raw_args: List(String)) {
   let app = project.app_name()
@@ -242,11 +230,12 @@ pub fn resource(name: String, raw_args: List(String)) {
   // Demo rows at boot (development only) and the production gate a bearer
   // admin route needs.
   let wired_paths = case seed {
-    True -> wire_demo_seed(app, singular, db)
+    True -> demo_seed.wire_demo_seed(app, singular, db)
     False -> []
   }
   let wired_paths = case options.admin_auth {
-    BearerAuth -> list.append(wired_paths, patch_config_admin_routes(app))
+    BearerAuth ->
+      list.append(wired_paths, demo_seed.patch_config_admin_routes(app))
     SessionAuth -> wired_paths
   }
 
@@ -294,102 +283,6 @@ pub fn resource(name: String, raw_args: List(String)) {
         "Generate it first (mastro gen resource <parents> <fields>) and"
         <> " regenerate this resource for a demo row.",
       )
-    }
-  }
-}
-
-/// Wire the resource demo seed into the entry point: development boots once
-/// with a row to look at, production never gets demo data.
-fn wire_demo_seed(
-  app: String,
-  resource_singular: String,
-  db: DbChoice,
-) -> List(String) {
-  case db {
-    NoDb -> []
-    Sqlite | Postgres -> {
-      let path = "src/" <> app <> ".gleam"
-      let assert Ok(content) = simplifile.read(path)
-      let repo_module = app <> "/data/" <> resource_singular <> "_repo"
-      let call = case db {
-        Postgres -> "db"
-        _ -> "db_path"
-      }
-
-      case string.contains(content, repo_module <> ".seed_demo(") {
-        True -> []
-        False -> {
-          let seed_line =
-            "      let _ = "
-            <> resource_singular
-            <> "_repo.seed_demo("
-            <> call
-            <> ")\n"
-          let content = gleam_file.add_import(content, "import " <> repo_module)
-          let content = add_demo_seed(content, seed_line)
-          let assert Ok(_) = simplifile.write(path, content)
-          [path]
-        }
-      }
-    }
-  }
-}
-
-/// The demo guard the entry point carries: seeded once at boot in
-/// development, never in production. The first resource adds the block; the
-/// next ones add their line to it.
-fn add_demo_seed(content: String, seed_line: String) -> String {
-  case string.split_once(content, demo_seed_marker) {
-    Error(_) -> insert_before_ctx(content, demo_seed_block(seed_line))
-    Ok(#(before, after)) ->
-      case string.split_once(after, "\n" <> demo_seed_after) {
-        Ok(#(branch, rest)) ->
-          before
-          <> demo_seed_marker
-          <> branch
-          <> "\n"
-          <> seed_line
-          <> demo_seed_after
-          <> rest
-        Error(_) -> content
-      }
-  }
-}
-
-/// Everything after the last seed line of the block, so a new line lands
-/// above the `Nil` that closes the branch.
-const demo_seed_after = "      Nil\n    }\n    False -> Nil"
-
-fn demo_seed_block(seed_line: String) -> String {
-  demo_seed_marker <> ": each resource seeds once, when its table is empty.
-  case config.is_development(cfg) {
-    True -> {
-" <> seed_line <> demo_seed_after <> "
-  }
-"
-}
-
-fn insert_before_ctx(content: String, block: String) -> String {
-  case string.split_once(content, "\n  let ctx = context.Context(") {
-    Ok(#(before, after)) ->
-      before <> "\n" <> block <> "  let ctx = context.Context(" <> after
-    Error(_) -> content
-  }
-}
-
-/// A bearer admin route makes `ADMIN_TOKEN` mandatory in production, so the
-/// boot gate has to know the app serves one.
-fn patch_config_admin_routes(app: String) -> List(String) {
-  let path = "src/" <> app <> "/config.gleam"
-  let assert Ok(content) = simplifile.read(path)
-  let patched =
-    string.replace(content, "admin_routes: False", "admin_routes: True")
-
-  case patched == content {
-    True -> []
-    False -> {
-      let assert Ok(_) = simplifile.write(path, patched)
-      [path]
     }
   }
 }
