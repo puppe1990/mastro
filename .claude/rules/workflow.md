@@ -193,6 +193,7 @@ CI and `mise.toml` pin Gleam 1.14. A newer local Gleam wraps function
 signatures the older one keeps on one line, so `gleam format --check` fails
 locally on files CI accepts. As of Gleam 1.18 those are:
 `src/mastro/csrf.gleam`, `src/mastro/doctor.gleam`, `src/mastro/jobs.gleam`,
-`src/mastro/kit.gleam` and
+`src/mastro/jobs/cron.gleam`, `src/mastro/kit.gleam` and
 `examples/tasks_app/src/tasks_app/data/task_repo.gleam`. Do not reformat them
-from a newer toolchain in unrelated changes.
+from a newer toolchain in unrelated changes — and never run `gleam format` on
+them, it silently flips the drift and CI starts failing.
