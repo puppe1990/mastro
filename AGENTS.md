@@ -5,8 +5,8 @@ the library lives in `src/mastro/`, the CLI code generator in `src/mastro/cli/`.
 
 ## Commands
 
-- Setup: Gleam 1.14+ and Erlang/OTP 27+ (`mise install` where mise is available)
-- Test: `gleam test` — 285 tests, headless, no database or network required
+- Setup: `mise install` (pins Gleam 1.14, Erlang 27 and rebar3 in `mise.toml`). With mise active `gleam` inside this repo is 1.14, matching CI.
+- Test: `gleam test` — 288 tests, headless, no database or network required
 - Test (browser JS): `npm test`
 - Build: `gleam build`
 - Format: `gleam format`, verify with `gleam format --check`
@@ -49,7 +49,7 @@ the library lives in `src/mastro/`, the CLI code generator in `src/mastro/cli/`.
 - Keep WHY comments and provenance (issue numbers, ADRs); delete only obvious noise.
 - Generated code must compile with zero warnings and pass `gleam format --check`.
 - Reuse the existing `mastro/rate_limit` and `mastro/jobs` retry policy; do not invent new retry, breaker or fallback behaviour.
-- Toolchain drift: on a Gleam newer than the pinned 1.14 the formatter wraps signatures differently, so `gleam format --check` fails on files CI accepts. Do not reformat those files in unrelated changes.
+- Toolchain drift: a Gleam newer than the pinned 1.14 wraps signatures differently, so `gleam format --check` fails on files CI accepts. Use the pinned toolchain (`mise exec -- gleam …`, or activate mise) and do not reformat those files from a newer toolchain — that flips the drift and CI starts failing.
 
 ## Testing
 

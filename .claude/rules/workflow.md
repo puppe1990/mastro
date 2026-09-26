@@ -189,9 +189,10 @@ gleam docs build
 
 ### Toolchain drift (known trap)
 
-CI and `mise.toml` pin Gleam 1.14. A newer local Gleam wraps function
-signatures the older one keeps on one line, so `gleam format --check` fails
-locally on files CI accepts. As of Gleam 1.18 those are:
+CI and `mise.toml` pin Gleam 1.14. Run the pinned toolchain (`mise exec -- gleam …`,
+or activate mise) and the formatter agrees with CI. A newer global Gleam wraps
+signatures that 1.14 keeps on one line, so `gleam format --check` fails locally
+on files CI accepts. As of Gleam 1.18 those are:
 `src/mastro/csrf.gleam`, `src/mastro/doctor.gleam`, `src/mastro/jobs.gleam`,
 `src/mastro/jobs/cron.gleam`, `src/mastro/kit.gleam` and
 `examples/tasks_app/src/tasks_app/data/task_repo.gleam`. Do not reformat them

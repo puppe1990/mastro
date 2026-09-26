@@ -8,13 +8,17 @@ Thanks for your interest in contributing to Mastro.
 git clone https://github.com/puppe1990/mastro.git
 cd mastro
 
+# Install mise if you do not have it (https://mise.jdx.dev)
+#   brew install mise        # or: curl https://mise.run | sh
 # Install toolchain (Gleam 1.14, Erlang 27, rebar3)
+# With mise active, `gleam` inside this repo is the pinned 1.14 — the same
+# version CI uses, so `gleam format --check` agrees with CI.
 mise install
 
 # Build
 gleam build
 
-# Run tests (21 tests: 12 unit + 9 integration)
+# Run tests (288 tests, headless)
 gleam test
 
 # Format
