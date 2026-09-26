@@ -11,6 +11,8 @@ import gleeunit/should
 import mastro/cli/component
 import mastro/cli/destroy
 import mastro/cli/gen
+import mastro/cli/gen/island as gen_island
+import mastro/cli/gen/live as gen_live
 import mastro/cli/gen/migration as gen_migration
 import mastro/cli/gen/page as gen_page
 import mastro/cli/jobs_cmd
@@ -801,7 +803,7 @@ pub fn gen_island_creates_files_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.island("counter")
+    gen_island.island("counter")
 
     file_exists("src/island_app/web/islands/counter.gleam") |> should.be_true
     file_exists("src/island_app/web/islands/counter_embed.gleam")
