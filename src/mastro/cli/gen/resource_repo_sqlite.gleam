@@ -306,7 +306,7 @@ fn first_id(db_path: String) -> Result(Int, Nil) {
 }
 
 /// The SQLite spelling of the total the pagination needs.
-fn repo_count_sqlite(table: String, display: String, q: String) -> String {
+fn repo_count_sqlite(table: String, display: String, _q: String) -> String {
   "/// A single integer column, decoded from its row.
 fn int_decoder() -> decode.Decoder(Int) {
   use value <- decode.field(0, decode.int)

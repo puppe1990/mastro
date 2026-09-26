@@ -4,7 +4,6 @@
 /// then runs it with the given arguments.
 ///
 import gleam/io
-import gleam/list
 import gleam/string
 import mastro/cli/format
 import mastro/cli/project
@@ -75,7 +74,6 @@ import gleam/dynamic/decode
 import gleam/erlang/process
 import gleam/int
 import gleam/io
-import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string

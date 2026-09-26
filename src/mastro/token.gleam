@@ -20,7 +20,6 @@
 import gleam/bit_array
 import gleam/crypto
 import gleam/int
-import gleam/result
 import gleam/string
 
 /// Token verification errors.
@@ -36,7 +35,7 @@ pub fn sign(
   secret: String,
   purpose: String,
   data: String,
-  max_age_seconds max_age: Int,
+  max_age_seconds _max_age: Int,
 ) -> String {
   let timestamp = system_time_seconds()
   let payload = purpose <> "." <> data <> "." <> int.to_string(timestamp)

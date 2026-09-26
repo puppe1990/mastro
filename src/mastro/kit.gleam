@@ -273,7 +273,8 @@ fn th_for(base: String, sort: String, dir: String) -> fn(Column) -> Element(Nil)
 
 pub fn pagination(base: String, page: Int, total_pages: Int) -> Element(Nil) {
   let links =
-    list.range(1, total_pages)
+    int.range(from: 1, to: total_pages + 1, with: [], run: list.prepend)
+    |> list.reverse
     |> list.map(fn(n) {
       case n == page {
         True ->

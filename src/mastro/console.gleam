@@ -7,7 +7,6 @@
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import gleam/string
 
 pub const max_history = 50

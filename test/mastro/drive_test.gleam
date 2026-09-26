@@ -8,7 +8,6 @@ import lustre/element
 import lustre/element/html
 import mastro/drive
 import mastro/layout
-import mastro/view
 import wisp
 
 fn el(label: String) -> element.Element(Nil) {
