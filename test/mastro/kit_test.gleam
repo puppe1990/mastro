@@ -147,6 +147,30 @@ pub fn pagination_base_test() {
   should.be_true(string.contains(out, "aria-label=\"Pagination\""))
 }
 
+pub fn pagination_keeps_a_filter_in_the_link_test() {
+  let out =
+    kit.pagination("/posts?q=term&sort=title&dir=asc", 2, 5)
+    |> element.to_string
+  should.be_true(string.contains(
+    out,
+    "/posts?q=term&amp;sort=title&amp;dir=asc&amp;page=3",
+  ))
+}
+
+pub fn table_keeps_a_filter_in_the_sort_link_test() {
+  let out =
+    kit.table(
+      [kit.Column(field: "title", label: "Title", sortable: True)],
+      [],
+      "/posts?q=term",
+      "title",
+      "asc",
+    )
+    |> element.to_string
+  should.be_true(string.contains(out, "/posts?q=term&amp;sort=title"))
+  should.be_true(string.contains(out, "dir=desc"))
+}
+
 pub fn link_to_data_attrs_test() {
   let out =
     kit.link_to("/items/1", "Delete", [
