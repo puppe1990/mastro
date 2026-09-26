@@ -13,7 +13,6 @@ import mastro/cli/destroy
 import mastro/cli/gen
 import mastro/cli/gen/auth as gen_auth
 import mastro/cli/gen/island as gen_island
-import mastro/cli/gen/live as gen_live
 import mastro/cli/gen/migration as gen_migration
 import mastro/cli/gen/page as gen_page
 import mastro/cli/jobs_cmd

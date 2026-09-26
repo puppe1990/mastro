@@ -1,10 +1,8 @@
 /// `gen island <name>` — a Lustre client island and its embed helper.
 ///
 import gleam/io
-import mastro/cli/files
 import mastro/cli/format
 import mastro/cli/project
-import mastro/cli/text
 import simplifile
 
 pub fn island(name: String) {

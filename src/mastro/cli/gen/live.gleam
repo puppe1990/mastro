@@ -1,7 +1,6 @@
 /// `gen live <name>` — a Lustre server component, its socket and handler.
 ///
 import gleam/io
-import mastro/cli/files
 import mastro/cli/format
 import mastro/cli/gen/router
 import mastro/cli/project
