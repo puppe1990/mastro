@@ -11,6 +11,8 @@ import gleeunit/should
 import mastro/cli/component
 import mastro/cli/destroy
 import mastro/cli/gen
+import mastro/cli/gen/migration as gen_migration
+import mastro/cli/gen/page as gen_page
 import mastro/cli/jobs_cmd
 import mastro/cli/migrate_cmd
 import mastro/cli/new
@@ -743,7 +745,7 @@ pub fn gen_page_creates_handler_and_patches_router_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.page("about")
+    gen_page.page("about")
 
     file_exists("src/page_app/web/about_handler.gleam") |> should.be_true
     file_exists("test/page_app/web/about_handler_test.gleam") |> should.be_true
@@ -830,7 +832,7 @@ pub fn gen_migration_writes_up_and_down_sections_test() {
     let assert Ok(cwd) = current_directory()
     let assert Ok(_) = set_cwd(project_dir)
 
-    gen.migration("add_email")
+    gen_migration.migration("add_email")
 
     let path = "src/mig_app/data/migrations/001_add_email.sql"
     file_contains(path, "-- up") |> should.be_true

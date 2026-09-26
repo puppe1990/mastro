@@ -10,6 +10,7 @@ import mastro/cli/files
 import mastro/cli/format
 import mastro/cli/gen/fields
 import mastro/cli/gen/gleam_file
+import mastro/cli/gen/migration
 import mastro/cli/gen/options
 import mastro/cli/gen/router
 import mastro/cli/gen/source
@@ -23,60 +24,6 @@ import simplifile
 
 /// The comment the demo seed block in the entry point carries.
 const demo_seed_marker = "  // Demo data for development"
-
-// =============================================================================
-// gen page
-// =============================================================================
-
-pub fn page(name: String) {
-  let app = project.app_name()
-
-  let handler_path = "src/" <> app <> "/web/" <> name <> "_handler.gleam"
-  let test_path = "test/" <> app <> "/web/" <> name <> "_handler_test.gleam"
-
-  // Create handler
-  let handler_content = "import " <> app <> "/context.{type Context}
-import " <> app <> "/web/layouts/root_layout
-import lustre/attribute.{class}
-import lustre/element.{text}
-import lustre/element/html.{h1, section}
-import wisp.{type Request, type Response}
-
-pub fn index(req: Request, _ctx: Context) -> Response {
-  section([class(\"" <> name <> "\")], [
-    h1([], [text(\"" <> text.capitalize(name) <> "\")]),
-  ])
-  |> root_layout.wrap(\"" <> text.capitalize(name) <> "\", req)
-  |> wisp.html_response(200)
-}
-"
-
-  let test_content =
-    "import gleeunit/should
-
-pub fn placeholder_test() {
-  1 + 1
-  |> should.equal(2)
-}
-"
-
-  let assert Ok(_) = simplifile.write(handler_path, handler_content)
-  files.ensure_dir_for(test_path)
-  let assert Ok(_) = simplifile.write(test_path, test_content)
-
-  // Patch router and format
-  let _ = router.patch_page(app, name)
-  let router_path = "src/" <> app <> "/router.gleam"
-  format.format_files([handler_path, test_path, router_path])
-
-  io.println("")
-  io.println("Created:")
-  io.println("  " <> handler_path)
-  io.println("  " <> test_path)
-  io.println("")
-  io.println("Updated:")
-  io.println("  " <> router_path)
-}
 
 // =============================================================================
 // gen resource
@@ -146,7 +93,7 @@ pub fn resource(name: String, raw_args: List(String)) {
     "src/"
     <> app
     <> "/data/migrations/"
-    <> next_migration_number(app)
+    <> migration.next_migration_number(app)
     <> "_create_"
     <> name
     <> ".sql"
@@ -442,29 +389,6 @@ fn patch_config_admin_routes(app: String) -> List(String) {
 }
 
 // =============================================================================
-// gen migration
-// =============================================================================
-
-pub fn migration(name: String) {
-  let app = project.app_name()
-  let dir = "src/" <> app <> "/data/migrations"
-  let _ = simplifile.create_directory_all(dir)
-
-  let number = next_migration_number(app)
-  let filename = number <> "_" <> name <> ".sql"
-  let path = dir <> "/" <> filename
-
-  let content =
-    "-- Migration: " <> name <> "\n" <> "-- up\n" <> "\n" <> "-- down\n" <> "\n"
-
-  let assert Ok(_) = simplifile.write(path, content)
-
-  io.println("")
-  io.println("Created:")
-  io.println("  " <> path)
-}
-
-// =============================================================================
 // gen auth
 // =============================================================================
 
@@ -494,7 +418,7 @@ pub fn auth() {
       "src/"
         <> app
         <> "/data/migrations/"
-        <> next_migration_number(app)
+        <> migration.next_migration_number(app)
         <> "_create_users.sql",
       auth_migration(),
     ),
@@ -2925,28 +2849,4 @@ pub fn wrong_password_test() {
   |> should.be_false
 }
 "
-}
-
-// =============================================================================
-// String helpers
-// =============================================================================
-
-fn next_migration_number(app: String) -> String {
-  let dir = "src/" <> app <> "/data/migrations"
-  case simplifile.read_directory(dir) {
-    Ok(files) -> {
-      let count = list.length(files) + 1
-      pad_number(count, 3)
-    }
-    Error(_) -> "001"
-  }
-}
-
-fn pad_number(n: Int, width: Int) -> String {
-  let s = int.to_string(n)
-  let padding = width - string.length(s)
-  case padding > 0 {
-    True -> string.repeat("0", padding) <> s
-    False -> s
-  }
 }

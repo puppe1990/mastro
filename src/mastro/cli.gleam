@@ -14,6 +14,8 @@ import mastro/cli/destroy
 import mastro/cli/dev
 import mastro/cli/doctor
 import mastro/cli/gen
+import mastro/cli/gen/migration as gen_migration
+import mastro/cli/gen/page as gen_page
 import mastro/cli/jobs_cmd
 import mastro/cli/link
 import mastro/cli/migrate_cmd
@@ -26,9 +28,9 @@ import mastro/cli/upgrade
 pub fn main() {
   case argv.load().arguments {
     ["new", name, ..flags] -> new.run(name, flags)
-    ["gen", "page", name, ..] -> gen.page(name)
+    ["gen", "page", name, ..] -> gen_page.page(name)
     ["gen", "resource", name, ..fields] -> gen.resource(name, fields)
-    ["gen", "migration", name, ..] -> gen.migration(name)
+    ["gen", "migration", name, ..] -> gen_migration.migration(name)
     ["gen", "auth", ..] -> gen.auth()
     ["gen", "island", name, ..] -> gen.island(name)
     ["gen", "live", name, ..] -> gen.live(name)
