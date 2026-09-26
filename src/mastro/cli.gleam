@@ -13,7 +13,12 @@ import mastro/cli/db
 import mastro/cli/destroy
 import mastro/cli/dev
 import mastro/cli/doctor
-import mastro/cli/gen
+import mastro/cli/gen/auth as gen_auth
+import mastro/cli/gen/island as gen_island
+import mastro/cli/gen/live as gen_live
+import mastro/cli/gen/migration as gen_migration
+import mastro/cli/gen/page as gen_page
+import mastro/cli/gen/resource as gen_resource
 import mastro/cli/jobs_cmd
 import mastro/cli/link
 import mastro/cli/migrate_cmd
@@ -26,12 +31,12 @@ import mastro/cli/upgrade
 pub fn main() {
   case argv.load().arguments {
     ["new", name, ..flags] -> new.run(name, flags)
-    ["gen", "page", name, ..] -> gen.page(name)
-    ["gen", "resource", name, ..fields] -> gen.resource(name, fields)
-    ["gen", "migration", name, ..] -> gen.migration(name)
-    ["gen", "auth", ..] -> gen.auth()
-    ["gen", "island", name, ..] -> gen.island(name)
-    ["gen", "live", name, ..] -> gen.live(name)
+    ["gen", "page", name, ..] -> gen_page.page(name)
+    ["gen", "resource", name, ..fields] -> gen_resource.resource(name, fields)
+    ["gen", "migration", name, ..] -> gen_migration.migration(name)
+    ["gen", "auth", ..] -> gen_auth.auth()
+    ["gen", "island", name, ..] -> gen_island.island(name)
+    ["gen", "live", name, ..] -> gen_live.live(name)
     ["gen", "component", "--list", ..] -> component.run("", ["--list"])
     ["gen", "component", stem, ..flags] -> component.run(stem, flags)
     ["destroy", "auth", ..flags] -> destroy.run("auth", "", flags)

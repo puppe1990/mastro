@@ -44,7 +44,17 @@ src/
     cli.gleam                ← CLI entry point
     cli/
       new.gleam              ← mastro new
-      gen.gleam              ← gen resource, gen page, gen auth, gen island
+      gen/
+        page.gleam           ← gen page
+        resource.gleam       ← gen resource (orchestration)
+        resource_*.gleam     ← the templates gen resource writes
+        auth.gleam           ← gen auth (orchestration)
+        auth_*.gleam         ← the auth templates
+        live.gleam           ← gen live
+        island.gleam         ← gen island
+        migration.gleam      ← gen migration
+        router.gleam         ← router.gleam patches every generator uses
+        fields.gleam         ← field type parsing and SQL/Gleam mapping
       templates.gleam        ← file content templates
       routes.gleam           ← mastro routes
       build.gleam            ← mastro build (island JS)
@@ -67,27 +77,27 @@ examples/
 
 ## How generators work
 
-1. Templates in `templates.gleam` produce file content as strings
-2. Generator functions in `gen.gleam` write files via `simplifile`
-3. Router patching finds `_, _ ->` catch-all and inserts routes before it
-4. `gleam format` runs on all generated `.gleam` files automatically
+1. Each command has a module in `src/mastro/cli/gen/` that writes its files
+   via `simplifile`; the content comes from that module's templates or from
+   `templates.gleam`
+2. Router patching (`src/mastro/cli/gen/router.gleam`) finds the `_, _ ->`
+   catch-all and inserts routes before it
+3. `gleam format` runs on all generated `.gleam` files automatically
 
 ## Adding a new generator
 
-1. Add the template function(s) in `gen.gleam` or `templates.gleam`
-2. Add the public function in `gen.gleam`
-3. Add the command match in `cli.gleam`
-4. Add an integration test in `test/mastro/cli/gen_test.gleam`
-5. Update `docs/cli.md`
+1. Add the module under `src/mastro/cli/gen/`, templates included
+2. Add the command match in `cli.gleam`
+3. Add an integration test in `test/mastro/cli/gen_test.gleam`
+4. Update `docs/cli.md`
 
 ## Adding a new field type
 
-1. Add to `to_gleam_type()` in `gen.gleam`
-2. Add to `to_sql_type()` and `to_sql_type_sqlite()` in `gen.gleam`
-3. Add to `form_default_value()` in `gen.gleam`
-4. Handle in form view rendering (the `form_field_elements` builder)
-5. Handle in `from_form_data` (the form decoder)
-6. Update `docs/field-types.md`
+1. Add the mapping in `src/mastro/cli/gen/fields.gleam` — `to_gleam_type`,
+   `to_sql_type`, `to_sql_type_sqlite` and `form_default_value`
+2. Handle in form view rendering (the `form_field_elements` builder)
+3. Handle in `from_form_data` (the form decoder)
+4. Update `docs/field-types.md`
 
 ## Conventions
 

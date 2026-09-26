@@ -19,7 +19,8 @@ the library lives in `src/mastro/`, the CLI code generator in `src/mastro/cli/`.
 ## Structure
 
 - `src/mastro/` — library: `validate`, `flash`, `migrate`, `session`, `csrf`, `jobs`, `kit`, `telemetry`, …
-- `src/mastro/cli/` — one module per CLI subcommand (`gen`, `jobs_cmd`, `routes`, `new`, `destroy`, …)
+- `src/mastro/cli/` — one module per CLI subcommand (`jobs_cmd`, `routes`, `new`, `destroy`, …)
+- `src/mastro/cli/gen/` — one module per generator (`page`, `migration`, `auth`, `island`, `live`, `resource` + its `resource_*` templates)
 - `src/mastro/cli.gleam` — entry point: argv → subcommand dispatch, prints `--help`
 - `src/mastro/cli/templates.gleam` — file contents written by the generators (plain strings)
 - `priv/static/js/` — browser JS and its `*.test.mjs`
