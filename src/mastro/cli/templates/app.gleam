@@ -227,12 +227,19 @@ pub fn repo_module(name: String, db: DbChoice) -> String {
     Postgres -> "import " <> name <> "/config.{type Config}
 import gleam/erlang/process
 import gleam/result
+import envoy
 import pog
 
+/// Connect to PostgreSQL. `pog` requires a username in the URL, so the
+/// default carries one; set `DATABASE_URL` for anything else.
 pub fn connect(cfg: Config) -> Result(pog.Connection, Nil) {
   let db_url = case cfg.env {
-    config.Test -> \"postgres://localhost:5432/" <> name <> "_test\"
-    _ -> \"postgres://localhost:5432/" <> name <> "_dev\"
+    config.Test -> \"postgres://postgres@localhost:5432/" <> name <> "_test\"
+    _ ->
+      case envoy.get(\"DATABASE_URL\") {
+        Ok(url) -> url
+        Error(_) -> \"postgres://postgres@localhost:5432/" <> name <> "_dev\"
+      }
   }
 
   let pool_name = process.new_name(prefix: \"" <> name <> "_db\")

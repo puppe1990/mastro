@@ -55,8 +55,10 @@ gleam test
 createdb blog_dev
 ```
 
-The generated `repo.gleam` connects to `postgres://localhost:5432/blog_dev`
-by default. No configuration needed for local development.
+The generated `repo.gleam` connects to
+`postgres://postgres@localhost:5432/blog_dev` by default, and uses
+`DATABASE_URL` when that is set. No configuration needed for local
+development.
 
 ## 3. Generate a posts resource
 
