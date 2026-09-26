@@ -9,7 +9,9 @@ import gleam/string
 import mastro/cli/files
 import mastro/cli/format
 import mastro/cli/gen/fields
+import mastro/cli/gen/gleam_file
 import mastro/cli/gen/options
+import mastro/cli/gen/router
 import mastro/cli/gen/source
 import mastro/cli/project
 import mastro/cli/templates
@@ -63,7 +65,7 @@ pub fn placeholder_test() {
   let assert Ok(_) = simplifile.write(test_path, test_content)
 
   // Patch router and format
-  let _ = patch_router_page(app, name)
+  let _ = router.patch_page(app, name)
   let router_path = "src/" <> app <> "/router.gleam"
   format.format_files([handler_path, test_path, router_path])
 
@@ -279,8 +281,8 @@ pub fn resource(name: String, raw_args: List(String)) {
 
   // Patch router and format
   let _ = case api_mode {
-    True -> patch_router_api_resource(app, name, singular)
-    False -> patch_router_resource(app, name, singular, options)
+    True -> router.patch_api_resource(app, name, singular)
+    False -> router.patch_resource(app, name, singular, options)
   }
   let router_path = "src/" <> app <> "/router.gleam"
 
@@ -370,7 +372,7 @@ fn wire_demo_seed(
             <> "_repo.seed_demo("
             <> call
             <> ")\n"
-          let content = add_import(content, "import " <> repo_module)
+          let content = gleam_file.add_import(content, "import " <> repo_module)
           let content = add_demo_seed(content, seed_line)
           let assert Ok(_) = simplifile.write(path, content)
           [path]
@@ -509,7 +511,7 @@ pub fn auth() {
   })
 
   // Patch router and format
-  let _ = patch_router_auth(app)
+  let _ = router.patch_auth(app)
   let router_path = "src/" <> app <> "/router.gleam"
   let gleam_paths =
     list.filter_map(files, fn(file) {
@@ -550,7 +552,7 @@ pub fn live(name: String) {
   let assert Ok(_) = simplifile.write(handler_path, live_handler(app, name))
 
   // Patch router
-  let _ = patch_router_live(app, name)
+  let _ = router.patch_live(app, name)
   let router_path = "src/" <> app <> "/router.gleam"
   format.format_files([component_path, socket_path, handler_path, router_path])
 
@@ -736,27 +738,6 @@ pub fn index(req: Request, _ctx: Context) -> Response {
   |> wisp.html_response(200)
 }
 "
-}
-
-fn patch_router_live(app: String, name: String) {
-  let router_path = "src/" <> app <> "/router.gleam"
-  let assert Ok(content) = simplifile.read(router_path)
-
-  let handler_import = "import " <> app <> "/web/" <> name <> "_live_handler"
-  let content = add_import(content, handler_import)
-
-  let socket_import = "import " <> app <> "/web/live/" <> name <> "_socket"
-  let content = add_import(content, socket_import)
-
-  let routes =
-    "\n    [\""
-    <> name
-    <> "\"], http.Get -> "
-    <> name
-    <> "_live_handler.index(req, ctx)"
-
-  let content = add_route(content, routes)
-  let assert Ok(_) = simplifile.write(router_path, content)
 }
 
 // =============================================================================
@@ -2512,183 +2493,6 @@ pub fn decode_valid_form_test() {
 }
 
 // =============================================================================
-// Router patching
-// =============================================================================
-
-fn patch_router_page(app: String, name: String) {
-  let router_path = "src/" <> app <> "/router.gleam"
-  let assert Ok(content) = simplifile.read(router_path)
-
-  // Add import
-  let import_line = "import " <> app <> "/web/" <> name <> "_handler"
-  let content = add_import(content, import_line)
-
-  // Add route before catch-all
-  let route_line =
-    "    [\""
-    <> name
-    <> "\"], http.Get -> "
-    <> name
-    <> "_handler.index(req, ctx)"
-
-  let content = add_route(content, route_line)
-
-  let assert Ok(_) = simplifile.write(router_path, content)
-}
-
-fn patch_router_resource(
-  app: String,
-  plural: String,
-  singular: String,
-  options: options.ResourceOptions,
-) {
-  let router_path = "src/" <> app <> "/router.gleam"
-  let assert Ok(content) = simplifile.read(router_path)
-
-  // Add import
-  let import_line = "import " <> app <> "/web/" <> singular <> "_handler"
-  let content = add_import(content, import_line)
-
-  // The admin routes are gated in the handler; `--public` adds the list
-  // anyone can read.
-  let public_route = case options.public {
-    True ->
-      "\n    [\""
-      <> plural
-      <> "\"], http.Get -> "
-      <> singular
-      <> "_handler.public_index(req, ctx)"
-    False -> ""
-  }
-
-  // Add routes before catch-all
-  let routes =
-    public_route
-    <> "\n    [\"admin\", \""
-    <> plural
-    <> "\"], http.Get -> "
-    <> singular
-    <> "_handler.index(req, ctx)
-    [\"admin\", \""
-    <> plural
-    <> "\", \"new\"], http.Get -> "
-    <> singular
-    <> "_handler.new(req, ctx)
-    [\"admin\", \""
-    <> plural
-    <> "\"], http.Post -> "
-    <> singular
-    <> "_handler.create(req, ctx)
-    [\"admin\", \""
-    <> plural
-    <> "\", id], http.Get -> "
-    <> singular
-    <> "_handler.show(req, ctx, id)
-    [\"admin\", \""
-    <> plural
-    <> "\", id, \"edit\"], http.Get -> "
-    <> singular
-    <> "_handler.edit(req, ctx, id)
-    [\"admin\", \""
-    <> plural
-    <> "\", id], http.Put -> "
-    <> singular
-    <> "_handler.update(req, ctx, id)
-    [\"admin\", \""
-    <> plural
-    <> "\", id], http.Delete -> "
-    <> singular
-    <> "_handler.delete(req, ctx, id)"
-
-  let content = add_route(content, routes)
-
-  let assert Ok(_) = simplifile.write(router_path, content)
-}
-
-fn patch_router_api_resource(app: String, plural: String, singular: String) {
-  let router_path = "src/" <> app <> "/router.gleam"
-  let assert Ok(content) = simplifile.read(router_path)
-
-  let import_line = "import " <> app <> "/web/" <> singular <> "_handler"
-  let content = add_import(content, import_line)
-
-  // API routes: no /new or /edit (those are HTML-only)
-  let routes =
-    "\n    [\"api\", \""
-    <> plural
-    <> "\"], http.Get -> "
-    <> singular
-    <> "_handler.index(req, ctx)
-    [\"api\", \""
-    <> plural
-    <> "\"], http.Post -> "
-    <> singular
-    <> "_handler.create(req, ctx)
-    [\"api\", \""
-    <> plural
-    <> "\", id], http.Get -> "
-    <> singular
-    <> "_handler.show(req, ctx, id)
-    [\"api\", \""
-    <> plural
-    <> "\", id], http.Put -> "
-    <> singular
-    <> "_handler.update(req, ctx, id)
-    [\"api\", \""
-    <> plural
-    <> "\", id], http.Delete -> "
-    <> singular
-    <> "_handler.delete(req, ctx, id)"
-
-  let content = add_route(content, routes)
-  let assert Ok(_) = simplifile.write(router_path, content)
-}
-
-fn add_import(content: String, import_line: String) -> String {
-  // Check if import already exists
-  case string.contains(content, import_line) {
-    True -> content
-    False -> {
-      // Find last import line and add after it
-      let lines = string.split(content, "\n")
-      let #(before, after) = split_after_imports(lines, [])
-      string.join(list.append(before, [import_line, ..after]), "\n")
-    }
-  }
-}
-
-fn split_after_imports(
-  lines: List(String),
-  acc: List(String),
-) -> #(List(String), List(String)) {
-  case lines {
-    [] -> #(list.reverse(acc), [])
-    [line, ..rest] ->
-      case string.starts_with(line, "import ") {
-        True -> split_after_imports(rest, [line, ..acc])
-        False ->
-          case acc {
-            [] -> split_after_imports(rest, [line, ..acc])
-            _ -> #(list.reverse(acc), [line, ..rest])
-          }
-      }
-  }
-}
-
-fn add_route(content: String, route_line: String) -> String {
-  // Insert before the catch-all `_, _ ->` pattern
-  case string.split_once(content, "    _, _ ->") {
-    Ok(#(before, after)) -> before <> route_line <> "\n    _, _ ->" <> after
-    Error(_) ->
-      // Fallback: try `_ ->` pattern
-      case string.split_once(content, "    _ ->") {
-        Ok(#(before, after)) -> before <> route_line <> "\n    _ ->" <> after
-        Error(_) -> content
-      }
-  }
-}
-
-// =============================================================================
 // Auth generator templates
 // =============================================================================
 
@@ -3121,25 +2925,6 @@ pub fn wrong_password_test() {
   |> should.be_false
 }
 "
-}
-
-fn patch_router_auth(app: String) {
-  let router_path = "src/" <> app <> "/router.gleam"
-  let assert Ok(content) = simplifile.read(router_path)
-
-  let import_line = "import " <> app <> "/web/auth_handler"
-  let content = add_import(content, import_line)
-
-  let routes =
-    "\n    [\"login\"], http.Get -> auth_handler.login_page(req, ctx)
-    [\"login\"], http.Post -> auth_handler.login(req, ctx)
-    [\"register\"], http.Get -> auth_handler.register_page(req, ctx)
-    [\"register\"], http.Post -> auth_handler.register(req, ctx)
-    [\"logout\"], http.Post -> auth_handler.logout(req, ctx)"
-
-  let content = add_route(content, routes)
-
-  let assert Ok(_) = simplifile.write(router_path, content)
 }
 
 // =============================================================================
