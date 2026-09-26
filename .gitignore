@@ -16,6 +16,9 @@ Thumbs.db
 # Claude
 .claude/settings.local.json
 
+# Agent tooling: machine-learned taste, local to a machine
+.commandcode/taste/
+
 # Test artifacts
 /test_app/
 /tmp/
