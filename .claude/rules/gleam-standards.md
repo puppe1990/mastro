@@ -89,11 +89,18 @@ pub type PostForm {
 
 ### Use Labelled Arguments for Clarity
 
-```gleam
-// GOOD: Clear at the call site
-pub fn wrap(content inner: Element(Nil), title page_title: String) -> String
+House style: the label repeats the argument name, so call sites read as prose.
 
-// Usage: root_layout.wrap(content: view, title: "Posts")
+```gleam
+// GOOD: label matches the argument name
+pub fn validate(
+  production production: Bool,
+  app_url app_url: Option(String),
+  admin_token admin_token: Option(String),
+  admin_routes admin_routes: Bool,
+) -> Result(Nil, List(Error))
+
+// Usage: security.validate(production: True, app_url: Some(url), ...)
 ```
 
 ### Use `use` for Callbacks (Wisp Pattern)

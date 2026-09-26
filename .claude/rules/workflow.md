@@ -8,14 +8,15 @@ Commands, processes, and common tasks for working on Mastro.
 
 ### Prerequisites
 
-- Gleam 1.14+ (via mise)
-- Erlang/OTP 27+ (via mise)
-- rebar3 (via mise)
+- Gleam 1.14+ (pinned by `mise.toml`)
+- Erlang/OTP 27+
+- rebar3
+- Node 22 (browser JS tests)
 
 ### Setup
 
 ```bash
-mise install
+mise install   # where mise is available
 gleam build
 gleam test
 ```
@@ -27,42 +28,42 @@ gleam test
 ### Building
 
 ```bash
-# Build all packages
-gleam build
-
-# Check types without full build
-gleam check
+gleam build    # build the package
+gleam check    # type-check without a full build
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
-gleam test
-
-# Run with output
-gleam test -- --nocapture
+gleam test     # all Gleam tests — headless, in-memory SQLite, no external services
+npm test       # browser JS tests (node --test, priv/static/js/*.test.mjs)
 ```
+
+`gleeunit` runs every `*_test` function under `test/`; there are no filter
+flags. To verify a single module, read its `test/mastro/<module>_test.gleam`
+and run the full suite.
 
 ### Formatting
 
 ```bash
-# Format all code
-gleam format
-
-# Check formatting (CI)
-gleam format --check
+gleam format         # format all code
+gleam format --check # verify (what CI runs)
 ```
 
 ### Documentation
 
 ```bash
-# Generate docs
 gleam docs build
-
-# Open in browser
 gleam docs build --open
 ```
+
+### Full CI locally
+
+```bash
+gleam format --check && gleam build && gleam test && npm test && gleam docs build
+```
+
+This mirrors `.github/workflows/ci.yml` exactly.
 
 ---
 
@@ -70,17 +71,22 @@ gleam docs build --open
 
 ### Running CLI Commands Locally
 
+The CLI is the `mastro/cli` module of this package:
+
 ```bash
-# Test `mastro new`
-gleam run -m mastro_cli -- new test_app
+# From the repo root
+gleam run -m mastro/cli -- new test_app --db postgres
 
-# Test `mastro gen resource`
 cd test_app
-gleam run -m mastro_cli -- gen resource posts title:string body:text published:bool
-
-# Test `mastro gen page`
-gleam run -m mastro_cli -- gen page about
+gleam run -m mastro/cli -- gen resource posts title:string body:text published:bool
+gleam run -m mastro/cli -- gen page about
 ```
+
+`./bin/build-cli.sh` creates a `./mastro` wrapper that delegates to
+`gleam run -m mastro/cli -- "$@"`.
+
+`test_app/` is gitignored; `mise run cli:new` and `mise run cli:clean` wrap
+creating and removing it.
 
 ### Testing Generated Output
 
@@ -88,34 +94,26 @@ After running a generator, verify:
 
 1. `gleam build` compiles without errors
 2. `gleam test` passes
-3. Generated files follow conventions (check against `rules/conventions.md`)
-4. Router patch is correct (routes before catch-all)
+3. Generated files follow conventions (`rules/conventions.md`)
+4. Router patch is correct (routes before the catch-all)
 5. `gleam format --check` passes on generated code
 
 ---
 
 ## Working on the Library
 
-### Validation Helpers
+Tests live under `test/` and mirror the module path:
 
-Test with:
-```bash
-gleam test -- validate
-```
+| Module | Test |
+|--------|------|
+| `src/mastro/validate.gleam` | `test/mastro_test.gleam` |
+| `src/mastro/migrate.gleam` | `test/mastro/migrate_test.gleam` |
+| `src/mastro/jobs.gleam` | `test/mastro/jobs_test.gleam` |
+| `src/mastro/session.gleam` | `test/mastro/session_test.gleam` |
+| `src/mastro/csrf.gleam` | `test/mastro/csrf_test.gleam` |
+| `src/mastro/security.gleam` | `test/mastro/security_test.gleam` |
 
-### Migration Runner
-
-Test with SQLite in-memory database:
-```bash
-gleam test -- migrate
-```
-
-### Flash Messages
-
-Test with mock request/response:
-```bash
-gleam test -- flash
-```
+New behaviour needs a test; every bugfix needs a regression test.
 
 ---
 
@@ -160,36 +158,39 @@ gleam test
 
 ### Version Bump
 
-1. Update version in `gleam.toml` for both packages
-2. Update `CHANGELOG.md`
+1. Update `version` in `gleam.toml`
+2. Update the version string printed by `mastro version` in `src/mastro/cli.gleam` (it is hardcoded)
 3. Commit: `chore: bump version to X.Y.Z`
 4. Tag: `git tag vX.Y.Z`
 5. Push: `git push && git push --tags`
 
 ### Publishing to Hex
 
+One package, at the repository root:
+
 ```bash
-# Publish library first (CLI depends on it)
-cd packages/mastro && gleam publish
-cd packages/mastro_cli && gleam publish
+gleam publish
 ```
 
 ---
 
 ## CI
 
-### GitHub Actions
-
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `ci.yml` | Push, PR | Build, test, format check |
-| `release.yml` | Tag push | Publish to Hex |
-
-### Local CI Simulation
+`.github/workflows/ci.yml` is the only workflow. On push to `main` and on
+pull requests it runs:
 
 ```bash
 gleam format --check
 gleam build
 gleam test
+npm test
 gleam docs build
 ```
+
+### Toolchain drift (known trap)
+
+CI and `mise.toml` pin Gleam 1.14. A newer local Gleam formats function
+signatures differently, so `gleam format --check` fails locally on files CI
+accepts (`src/mastro/jobs.gleam`, `src/mastro/kit.gleam`,
+`src/mastro/telemetry.gleam` as of Gleam 1.18). Do not reformat those files
+from a newer toolchain in unrelated changes.

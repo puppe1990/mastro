@@ -2,15 +2,15 @@
 
 ---
 
-## Two Packages, Not One
+## One Package, Two Deliverables
 
-Mastro ships as two separate packages:
+Mastro ships as a single Gleam package with two deliverables:
 
-1. **`mastro`** (library) — runtime helpers imported by generated projects
-2. **`mastro_cli`** (CLI) — code generator, development tool only
+1. **`src/mastro/`** (library) — runtime helpers imported by generated projects
+2. **`src/mastro/cli/`** (CLI) — code generator, development tool only
 
 The CLI is never a runtime dependency. Generated code imports `mastro`,
-`wisp`, `lustre`, and database drivers — not `mastro_cli`.
+`wisp`, `lustre`, and database drivers — never `mastro/cli`.
 
 ## Build On the Ecosystem
 

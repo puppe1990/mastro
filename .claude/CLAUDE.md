@@ -4,6 +4,8 @@
 
 Mastro gives Gleam developers Phoenix-like coherence and Rails-like convention without macros, magic, or hidden runtime tricks. It is a CLI code generator that produces plain Gleam code, plus a small library of helpers for validation, flash messages, migrations, and testing.
 
+**Agent rules, commands and structure live in [../AGENTS.md](../AGENTS.md) — read it first.** This file covers philosophy and architecture; `.claude/rules/` holds the detailed conventions.
+
 ## Philosophy
 
 1. **Conventions over assembly** — One obvious way to structure an app. Default project layout, naming rules, routing shape.
@@ -19,32 +21,40 @@ Mastro gives Gleam developers Phoenix-like coherence and Rails-like convention w
 
 ## Architecture
 
+One Gleam package, two deliverables:
+
 ```
-mastro (monorepo)
-├── packages/
-│   ├── mastro/          ← Library: validation, flash, migrations, test helpers
-│   └── mastro_cli/      ← CLI: code generators, project scaffolding
-└── docs/                 ← Golden path, ADRs, tutorials
+mastro/
+├── src/mastro/          ← Library: validate, flash, migrate, session, csrf, jobs, rate_limit, kit, telemetry
+├── src/mastro/cli/      ← CLI: code generators, project scaffolding
+├── test/                ← mirrors src/
+├── docs/                ← user docs, ADRs, golden path
+├── examples/            ← blog (Postgres), tasks_app (SQLite)
+└── priv/static/js/      ← browser JS and its tests
 ```
 
 ### Two Deliverables
 
-**`mastro` (library)** — Published to Hex. Imported by generated projects. Contains:
+**Library (`src/mastro/`, re-exported by `src/mastro.gleam`)** — imported by generated projects. Contains:
 - Validation helpers (required, min_length, max_length, format, etc.)
 - Flash message helpers (signed cookies)
-- Migration runner (SQL files, tracking table)
-- Test helpers (request builders)
-- Dev error page
+- Session, CSRF, CORS, rate limiting, telemetry
+- Job queue (`mastro/jobs`) and migration runner (SQL files, tracking table)
+- Kit components, test helpers (request builders)
+- Dev error page and dev logs
 
-**`mastro_cli` (CLI tool)** — Installed as a binary. Generates code. Contains:
+**CLI (`src/mastro/cli/`, entry point `src/mastro/cli.gleam`)** — development tool only, never an import of generated code at runtime:
 - `mastro new` — scaffold a project
-- `mastro gen page` — handler + route
-- `mastro gen resource` — full CRUD (handler, views, form, domain type, repo, migration)
-- `mastro gen auth` — starter auth system
-- `mastro gen migration` — SQL migration file
-- `mastro migrate` — run pending migrations
-- `mastro dev` — dev server wrapper
-- `mastro routes` — print route table
+- `mastro gen page | resource | auth | migration | island | live | component`
+- `mastro destroy` — remove generated files and patches
+- `mastro migrate`, `mastro db`, `mastro seed` — database tasks
+- `mastro jobs` — run and inspect the queue
+- `mastro routes`, `mastro build`, `mastro dev`, `mastro doctor`, `mastro console`
+- `mastro assets`, `mastro pwa`, `mastro link`, `mastro upgrade`
+
+Full command list and flags: `docs/cli.md` and `mastro --help`.
+
+Generated projects depend on the `mastro` package; in a local checkout, `mastro link <path/to/mastro>` points their `gleam.toml` at the source tree.
 
 ### Generated App Structure
 
@@ -54,11 +64,12 @@ my_app/
     my_app.gleam                    ← entry point
     my_app/
       config.gleam                  ← typed config, env-driven
+      context.gleam                 ← shared Context (config + db)
       router.gleam                  ← all routes, pattern matched
 
       web/                          ← HTTP/UI layer
         handlers, views, forms,
-        layouts, components, middleware
+        layouts, components, middleware, islands
 
       domain/                       ← business logic (no framework imports)
 
@@ -103,19 +114,13 @@ Pure Gleam types. No framework imports. No database imports. Your business logic
 
 Raw SQL via Pog (Postgres) or Sqlight (SQLite). Typed decoders. No ORM.
 
-## Ecosystem Dependencies
+## Dependencies
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `wisp` | >= 2.2 | HTTP handlers, middleware, request/response |
-| `lustre` | >= 5.6 | HTML templating (server-side), views |
-| `mist` | >= 5.0 | HTTP server (BEAM) |
-| `pog` | >= 4.1 | PostgreSQL client (optional) |
-| `sqlight` | >= 1.0 | SQLite client (optional) |
-| `gleam_http` | >= 4.3 | Core HTTP types |
-| `gleam_stdlib` | >= 0.44 | Standard library |
-| `gleam_erlang` | >= 0.34 | Erlang interop |
-| `gleeunit` | >= 1.0 | Test runner |
+Versions live in `gleam.toml` (framework) and `src/mastro/cli/templates.gleam` (generated projects).
+
+**This package** — `gleam_stdlib`, `gleam_erlang`, `gleam_otp`, `gleam_http`, `gleam_json`, `wisp`, `lustre`, `glint`, `argv`, `tom`, `simplifile`, `exception`, `gleam_crypto`; dev: `gleeunit`.
+
+**Injected into generated projects** — `mist` (HTTP server), `envoy` (dotenv), `wisp`, `lustre`, `gleam_json`, `mastro`, plus `pog` (Postgres) or `sqlight` (SQLite); dev: `gleeunit`.
 
 ## Rules
 
@@ -130,29 +135,19 @@ Raw SQL via Pog (Postgres) or Sqlight (SQLite). Typed decoders. No ORM.
 
 ### Common Commands
 
-```bash
-# Development
-gleam build
-gleam test
-gleam format --check
-
-# Run the CLI locally
-gleam run -m mastro_cli -- new my_app
-gleam run -m mastro_cli -- gen resource posts title:string body:text
-
-# Docs
-gleam docs build
-```
+See [../AGENTS.md](../AGENTS.md#commands) — single source of truth for commands.
 
 ### Key Files
 
 | Path | Purpose |
 |------|---------|
-| `packages/mastro/src/mastro.gleam` | Library entry point |
-| `packages/mastro/src/mastro/validate.gleam` | Validation helpers |
-| `packages/mastro/src/mastro/flash.gleam` | Flash message helpers |
-| `packages/mastro/src/mastro/migrate.gleam` | Migration runner |
-| `packages/mastro/src/mastro/testing.gleam` | Test helpers |
-| `packages/mastro_cli/src/mastro_cli.gleam` | CLI entry point |
-| `packages/mastro_cli/src/mastro_cli/gen/` | Code generators |
+| `src/mastro.gleam` | Library entry point (re-exports) |
+| `src/mastro/validate.gleam` | Validation helpers |
+| `src/mastro/flash.gleam` | Flash message helpers |
+| `src/mastro/migrate.gleam` | Migration runner |
+| `src/mastro/jobs.gleam` | Job queue and retry policy |
+| `src/mastro/testing.gleam` | Test helpers |
+| `src/mastro/cli.gleam` | CLI entry point |
+| `src/mastro/cli/gen.gleam` | Code generators (page, resource, auth, island, live, migration) |
+| `src/mastro/cli/templates.gleam` | File content templates |
 | `docs/GOLDEN_PATH.md` | Golden path specification |
