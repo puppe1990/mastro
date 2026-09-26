@@ -45,6 +45,67 @@ fn destroy_resource(app: String, plural: String, dry_run: Bool) {
 
   remove_migrations(app, plural, False, dry_run)
   unroute(app, singular <> "_handler", dry_run)
+  unwire_demo_seed(app, singular, dry_run)
+}
+
+/// Drop the resource's demo seed from the entry point: its import and its
+/// line inside the development guard. The guard goes with the last line.
+fn unwire_demo_seed(app: String, singular: String, dry_run: Bool) {
+  let path = "src/" <> app <> ".gleam"
+  case simplifile.read(path) {
+    Error(_) -> Nil
+    Ok(content) -> {
+      let kept =
+        content
+        |> string.split("\n")
+        |> list.filter(fn(line) {
+          !string.contains(
+            line,
+            "import " <> app <> "/data/" <> singular <> "_repo",
+          )
+          && !string.contains(line, singular <> "_repo.seed_demo(")
+        })
+        |> string.join("\n")
+
+      let kept = case string.contains(kept, ".seed_demo(") {
+        True -> kept
+        False -> remove_demo_seed_block(kept)
+      }
+
+      case kept == content {
+        True -> Nil
+        False ->
+          case dry_run {
+            True ->
+              io.println(
+                "would patch "
+                <> path
+                <> " (-"
+                <> singular
+                <> "_repo.seed_demo)",
+              )
+            False -> {
+              let assert Ok(_) = simplifile.write(path, kept)
+              format.format_files([path])
+              io.println("patched " <> path)
+            }
+          }
+      }
+    }
+  }
+}
+
+/// Remove the development seed guard once its last line is gone, so the
+/// entry point does not keep an empty case behind.
+fn remove_demo_seed_block(content: String) -> String {
+  case string.split_once(content, "  // Demo data for development") {
+    Error(_) -> content
+    Ok(#(before, after)) ->
+      case string.split_once(after, "\n  }\n") {
+        Error(_) -> content
+        Ok(#(_, rest)) -> before <> rest
+      }
+  }
 }
 
 fn destroy_handler(app: String, name: String, dry_run: Bool) {
@@ -123,7 +184,7 @@ fn unroute(app: String, fragment: String, dry_run: Bool) {
       let kept =
         content
         |> string.split("\n")
-        |> list.filter(fn(line) { !string.contains(line, fragment) })
+        |> drop_routes(fragment, [])
         |> string.join("\n")
 
       case kept == content {
@@ -140,6 +201,36 @@ fn unroute(app: String, fragment: String, dry_run: Bool) {
           }
       }
     }
+  }
+}
+
+/// Drop every line carrying the fragment, and the pattern line a long route
+/// left behind: the formatter wraps
+/// `["posts", id, "edit"], http.Get ->` and its handler onto two lines, and
+/// only the handler carries the module name.
+fn drop_routes(
+  lines: List(String),
+  fragment: String,
+  kept: List(String),
+) -> List(String) {
+  case lines {
+    [] -> list.reverse(kept)
+    [line, ..rest] ->
+      case string.contains(line, fragment) {
+        False -> drop_routes(rest, fragment, [line, ..kept])
+        True -> drop_routes(rest, fragment, drop_pattern_line(kept))
+      }
+  }
+}
+
+fn drop_pattern_line(kept: List(String)) -> List(String) {
+  case kept {
+    [previous, ..remaining] ->
+      case string.ends_with(string.trim(previous), "->") {
+        True -> remaining
+        False -> kept
+      }
+    [] -> kept
   }
 }
 

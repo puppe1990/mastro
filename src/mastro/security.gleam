@@ -10,6 +10,8 @@
 //// `client_ip` trusts `X-Forwarded-For` only for peers the operator listed,
 //// so a spoofed header from the open internet is ignored.
 
+import gleam/bit_array
+import gleam/crypto
 import gleam/http/request
 import gleam/http/response
 import gleam/list
@@ -139,6 +141,44 @@ pub fn describe(errors: List(Error)) -> String {
     }
   })
   |> string.join("; ")
+}
+
+// -- Bearer admin gate --------------------------------------------------------
+
+/// The token in an `Authorization: Bearer <token>` header, when there is one.
+pub fn bearer_token(req: request.Request(a)) -> Result(String, Nil) {
+  use value <- result.try(request.get_header(req, "authorization"))
+  case string.starts_with(value, "Bearer ") {
+    False -> Error(Nil)
+    True ->
+      case string.trim(string.drop_start(value, 7)) {
+        "" -> Error(Nil)
+        token -> Ok(token)
+      }
+  }
+}
+
+/// Does `req` carry the admin token the app expects? With no `ADMIN_TOKEN`
+/// configured there is nothing to compare against, so development opens the
+/// gate and production closes it — a production app refuses to boot without
+/// the token anyway (`validate`).
+pub fn bearer_authorized(
+  req: request.Request(a),
+  admin_token: Option(String),
+  production: Bool,
+) -> Bool {
+  case admin_token {
+    Some(token) if token != "" ->
+      case bearer_token(req) {
+        Ok(candidate) ->
+          crypto.secure_compare(
+            bit_array.from_string(candidate),
+            bit_array.from_string(token),
+          )
+        Error(_) -> False
+      }
+    _ -> !production
+  }
 }
 
 // -- Client address -----------------------------------------------------------

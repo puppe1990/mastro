@@ -89,6 +89,31 @@ pub fn index(req: Request, ctx: Context) -> Response {
 }
 ```
 
+## Generated admin gates
+
+`mastro gen resource` gates its admin routes for you. With the default
+`--admin-auth session`, every admin action starts with the gate the
+generator wrote:
+
+```gleam
+pub fn index(req: Request, ctx: Context) -> Response {
+  use <- require_admin(req, ctx)
+  // ...
+}
+```
+
+`require_admin` reads the signed `_user_id` cookie and sends an
+anonymous visitor to `/login` — swap it for `auth.require_auth` in the
+handler when you want the user row loaded.
+
+`--admin-auth bearer` writes a gate that compares `ADMIN_TOKEN` with an
+`Authorization: Bearer` header instead, and flips `admin_routes: True` in
+`config.validate/1`, so production refuses to boot without the token. In
+development an unset token opens the gate.
+
+`--public` adds a list at `/<plural>` that nobody has to log in for; the
+admin routes stay gated under `/admin/<plural>`.
+
 ## Password hashing
 
 The generated `auth.gleam` uses `gleam_crypto` SHA-256 hashing. This

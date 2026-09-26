@@ -9,12 +9,22 @@ import gleam/string
 import mastro/cli/format
 import mastro/cli/project
 import mastro/cli/templates
-import mastro/cli/types.{type DbChoice, NoDb, Postgres, Sqlite}
+import mastro/cli/types.{
+  type AdminAuth, type DbChoice, BearerAuth, NoDb, Postgres, SessionAuth, Sqlite,
+}
 import simplifile
+
+/// The comment the demo seed block in the entry point carries.
+const demo_seed_marker = "  // Demo data for development"
 
 /// Flags that change what a generated resource ships.
 pub type ResourceOptions {
-  ResourceOptions(public: Bool, paginate: Bool, seed: Bool, admin_auth: String)
+  ResourceOptions(
+    public: Bool,
+    paginate: Bool,
+    seed: Bool,
+    admin_auth: AdminAuth,
+  )
 }
 
 fn parse_resource_options(args: List(String)) -> ResourceOptions {
@@ -22,9 +32,27 @@ fn parse_resource_options(args: List(String)) -> ResourceOptions {
     public: list.contains(args, "--public"),
     paginate: list.contains(args, "--paginate"),
     seed: !list.contains(args, "--no-seed"),
-    admin_auth: extract_flag_value(args, "--admin-auth")
-      |> result.unwrap("session"),
+    admin_auth: parse_admin_auth(extract_flag_value(args, "--admin-auth")),
   )
+}
+
+fn parse_admin_auth(value: Result(String, Nil)) -> AdminAuth {
+  case value {
+    Ok("bearer") -> BearerAuth
+    Ok("session") -> SessionAuth
+    Ok(other) -> {
+      io.println("Unknown --admin-auth " <> other <> ", using session.")
+      SessionAuth
+    }
+    Error(_) -> SessionAuth
+  }
+}
+
+fn auth_label(auth: AdminAuth) -> String {
+  case auth {
+    SessionAuth -> "session"
+    BearerAuth -> "bearer"
+  }
 }
 
 // =============================================================================
@@ -118,6 +146,19 @@ pub fn resource(name: String, raw_args: List(String)) {
     references |> list.map(fn(parent) { #(parent <> "_id", "int") })
   let fields = list.append(scalar_fields, reference_fields)
 
+  // A reference whose parent was never generated has no repo to seed: the
+  // demo seed would not compile, so it is skipped with a note.
+  let seed =
+    options.seed
+    && list.all(references, fn(parent) { parent_repo_exists(app, parent) })
+  let missing_parents = case options.seed {
+    True ->
+      references
+      |> list.unique
+      |> list.filter(fn(parent) { !parent_repo_exists(app, parent) })
+    False -> []
+  }
+
   // Sortable columns: the scalar fields the index shows. The display field
   // (search target) is the first one.
   let sortable = list.map(scalar_fields, fn(f) { f.0 })
@@ -173,7 +214,15 @@ pub fn resource(name: String, raw_args: List(String)) {
     True ->
       simplifile.write(
         handler_path,
-        api_resource_handler(app, name, singular, type_name, db, fields),
+        api_resource_handler(
+          app,
+          name,
+          singular,
+          type_name,
+          db,
+          fields,
+          options.admin_auth,
+        ),
       )
     False ->
       simplifile.write(
@@ -185,6 +234,8 @@ pub fn resource(name: String, raw_args: List(String)) {
           type_name,
           first_field,
           db,
+          options.public,
+          options.admin_auth,
         ),
       )
   }
@@ -195,7 +246,17 @@ pub fn resource(name: String, raw_args: List(String)) {
       let assert Ok(_) =
         simplifile.write(
           views_path,
-          resource_views(app, name, singular, type_name, fields),
+          resource_views(
+            app,
+            name,
+            singular,
+            type_name,
+            fields,
+            references,
+            sortable,
+            display_field,
+            options,
+          ),
         )
       let assert Ok(_) =
         simplifile.write(
@@ -233,6 +294,7 @@ pub fn resource(name: String, raw_args: List(String)) {
         references,
         sortable,
         display_field,
+        seed,
       ),
     )
 
@@ -251,10 +313,22 @@ pub fn resource(name: String, raw_args: List(String)) {
   // Patch router and format
   let _ = case api_mode {
     True -> patch_router_api_resource(app, name, singular)
-    False -> patch_router_resource(app, name, singular)
+    False -> patch_router_resource(app, name, singular, options)
   }
   let router_path = "src/" <> app <> "/router.gleam"
-  format.format_files([router_path, ..created_paths])
+
+  // Demo rows at boot (development only) and the production gate a bearer
+  // admin route needs.
+  let wired_paths = case seed {
+    True -> wire_demo_seed(app, singular, db)
+    False -> []
+  }
+  let wired_paths = case options.admin_auth {
+    BearerAuth -> list.append(wired_paths, patch_config_admin_routes(app))
+    SessionAuth -> wired_paths
+  }
+
+  format.format_files(list.append([router_path, ..created_paths], wired_paths))
 
   io.println("")
   io.println("Created:")
@@ -272,12 +346,130 @@ pub fn resource(name: String, raw_args: List(String)) {
   io.println("  " <> test_path)
   io.println("")
   io.println("Updated:")
-  io.println("  " <> router_path)
+  list.each([router_path, ..wired_paths], fn(path) { io.println("  " <> path) })
   io.println("")
   io.println("Flags: " <> describe_options(options))
+  io.println(
+    "Admin: /admin/" <> name <> " (" <> auth_label(options.admin_auth) <> ")",
+  )
+  case options.public {
+    True -> io.println("Public: /" <> name)
+    False -> Nil
+  }
   case references {
     [] -> Nil
     _ -> io.println("Foreign keys: " <> string.join(references, ", "))
+  }
+  case missing_parents {
+    [] -> Nil
+    _ -> {
+      io.println("")
+      io.println(
+        "No demo seed: "
+        <> string.join(missing_parents, ", ")
+        <> " has no repo module yet.",
+      )
+      io.println(
+        "Generate it first (mastro gen resource <parents> <fields>) and"
+        <> " regenerate this resource for a demo row.",
+      )
+    }
+  }
+}
+
+/// Wire the resource demo seed into the entry point: development boots once
+/// with a row to look at, production never gets demo data.
+fn wire_demo_seed(
+  app: String,
+  resource_singular: String,
+  db: DbChoice,
+) -> List(String) {
+  case db {
+    NoDb -> []
+    Sqlite | Postgres -> {
+      let path = "src/" <> app <> ".gleam"
+      let assert Ok(content) = simplifile.read(path)
+      let repo_module = app <> "/data/" <> resource_singular <> "_repo"
+      let call = case db {
+        Postgres -> "db"
+        _ -> "db_path"
+      }
+
+      case string.contains(content, repo_module <> ".seed_demo(") {
+        True -> []
+        False -> {
+          let seed_line =
+            "      let _ = "
+            <> resource_singular
+            <> "_repo.seed_demo("
+            <> call
+            <> ")\n"
+          let content = add_import(content, "import " <> repo_module)
+          let content = add_demo_seed(content, seed_line)
+          let assert Ok(_) = simplifile.write(path, content)
+          [path]
+        }
+      }
+    }
+  }
+}
+
+/// The demo guard the entry point carries: seeded once at boot in
+/// development, never in production. The first resource adds the block; the
+/// next ones add their line to it.
+fn add_demo_seed(content: String, seed_line: String) -> String {
+  case string.split_once(content, demo_seed_marker) {
+    Error(_) -> insert_before_ctx(content, demo_seed_block(seed_line))
+    Ok(#(before, after)) ->
+      case string.split_once(after, "\n" <> demo_seed_after) {
+        Ok(#(branch, rest)) ->
+          before
+          <> demo_seed_marker
+          <> branch
+          <> "\n"
+          <> seed_line
+          <> demo_seed_after
+          <> rest
+        Error(_) -> content
+      }
+  }
+}
+
+/// Everything after the last seed line of the block, so a new line lands
+/// above the `Nil` that closes the branch.
+const demo_seed_after = "      Nil\n    }\n    False -> Nil"
+
+fn demo_seed_block(seed_line: String) -> String {
+  demo_seed_marker <> ": each resource seeds once, when its table is empty.
+  case config.is_development(cfg) {
+    True -> {
+" <> seed_line <> demo_seed_after <> "
+  }
+"
+}
+
+fn insert_before_ctx(content: String, block: String) -> String {
+  case string.split_once(content, "\n  let ctx = context.Context(") {
+    Ok(#(before, after)) ->
+      before <> "\n" <> block <> "  let ctx = context.Context(" <> after
+    Error(_) -> content
+  }
+}
+
+/// A bearer admin route makes `ADMIN_TOKEN` mandatory in production, so the
+/// boot gate has to know the app serves one.
+fn patch_config_admin_routes(app: String) -> List(String) {
+  let path = "src/" <> app <> "/config.gleam"
+  let assert Ok(content) = simplifile.read(path)
+  let patched =
+    string.replace(content, "admin_routes: False", "admin_routes: True")
+
+  case patched == content {
+    True -> []
+    False -> {
+      let assert Ok(_) = simplifile.write(path, patched)
+      [path]
+    }
   }
 }
 
@@ -295,7 +487,7 @@ fn describe_options(options: ResourceOptions) -> String {
       True -> "seed"
       False -> "no-seed"
     },
-    "admin-auth=" <> options.admin_auth,
+    "admin-auth=" <> auth_label(options.admin_auth),
   ]
   string.join(parts, ", ")
 }
@@ -752,10 +944,15 @@ fn api_resource_handler(
   type_name: String,
   db: DbChoice,
   fields: List(#(String, String)),
+  admin_auth: AdminAuth,
 ) -> String {
   let db_arg = case db {
     Sqlite -> "ctx.db_path"
     _ -> "ctx.db"
+  }
+  let auth_imports = case admin_auth {
+    SessionAuth -> ""
+    BearerAuth -> "\nimport " <> app_name <> "/config\nimport mastro/security"
   }
 
   // Build JSON object fields for serialization
@@ -801,14 +998,19 @@ import " <> app_name <> "/context.{type Context}
 import " <> app_name <> "/data/" <> resource_singular <> "_repo
 import " <> app_name <> "/domain/" <> resource_singular <> "
 import mastro/query
-import wisp.{type Request, type Response}
+import wisp.{type Request, type Response}" <> auth_imports <> "
 
+" <> templates.auth_guard(admin_auth, True) <> "
 pub fn index(req: Request, ctx: Context) -> Response {
+  use <- require_admin(req, ctx)
   let params = query.parse(req.query)
   let q = dict.get(params, \"q\") |> result.unwrap(\"\")
   let sort = dict.get(params, \"sort\") |> result.unwrap(\"\")
   let dir = dict.get(params, \"dir\") |> result.unwrap(\"\")
-  let page = dict.get(params, \"page\") |> int.parse |> result.unwrap(1)
+  let page =
+    dict.get(params, \"page\")
+    |> result.try(int.parse)
+    |> result.unwrap(1)
 
   let items = " <> resource_singular <> "_repo.list(" <> db_arg <> ", q, sort, dir, page)
   let body =
@@ -818,6 +1020,7 @@ pub fn index(req: Request, ctx: Context) -> Response {
 }
 
 pub fn show(req: Request, ctx: Context, id: String) -> Response {
+  use <- require_admin(req, ctx)
   case int.parse(id) {
     Error(_) -> wisp.json_response(\"{\\\"error\\\":\\\"not found\\\"}\", 404)
     Ok(id) ->
@@ -831,18 +1034,21 @@ pub fn show(req: Request, ctx: Context, id: String) -> Response {
 }
 
 pub fn create(req: Request, ctx: Context) -> Response {
+  use <- require_admin(req, ctx)
   use _json_body <- wisp.require_json(req)
   // TODO: decode JSON body into " <> type_name <> "Params and create
   wisp.json_response(\"{\\\"error\\\":\\\"not implemented\\\"}\", 501)
 }
 
 pub fn update(req: Request, ctx: Context, id: String) -> Response {
+  use <- require_admin(req, ctx)
   use _json_body <- wisp.require_json(req)
   // TODO: decode JSON body into " <> type_name <> "Params and update
   wisp.json_response(\"{\\\"error\\\":\\\"not implemented\\\"}\", 501)
 }
 
 pub fn delete(req: Request, ctx: Context, id: String) -> Response {
+  use <- require_admin(req, ctx)
   case int.parse(id) {
     Error(_) -> wisp.json_response(\"{\\\"error\\\":\\\"not found\\\"}\", 404)
     Ok(id) -> {
@@ -862,17 +1068,22 @@ fn resource_views(
   resource_singular: String,
   type_name: String,
   fields: List(#(String, String)),
+  references: List(String),
+  sortable: List(String),
+  display_field: String,
+  options: ResourceOptions,
 ) -> String {
   let first_field = case fields {
     [#(name, _), ..] -> name
     [] -> "id"
   }
+  let admin_base = "/admin/" <> resource_plural
 
   let form_field_elements =
     fields
     |> list.map(fn(f) {
       let #(fname, ftype) = f
-      let label_text = capitalize(fname)
+      let label_text = field_label(fname)
       case ftype {
         "bool" -> "      div([class(\"field\")], [
         label([], [
@@ -908,35 +1119,190 @@ fn resource_views(
     True -> "\nimport gleam/float"
     False -> ""
   }
+  let bool_import = case list.any(fields, fn(f) { f.1 == "bool" }) {
+    True -> "\nimport gleam/bool"
+    False -> ""
+  }
+  let html_imports = case list.any(fields, fn(f) { f.1 == "text" }) {
+    True -> "a, button, div, form, h1, input, label, p, section, textarea,"
+    False -> "a, button, div, form, h1, input, label, p, section,"
+  }
 
-  "import gleam/int" <> float_import <> "
+  let columns =
+    fields
+    |> list.map(fn(f) {
+      let #(fname, _) = f
+      "    kit.Column(field: \""
+      <> fname
+      <> "\", label: \""
+      <> field_label(fname)
+      <> "\", sortable: "
+      <> bool_literal(list.contains(sortable, fname))
+      <> "),"
+    })
+    |> string.join("\n")
+
+  let row_cells =
+    fields
+    |> list.index_map(fn(f, index) {
+      let #(fname, ftype) = f
+      let value = field_to_text(ftype, "item." <> fname)
+      let content = case index {
+        0 ->
+          "a([href(\""
+          <> admin_base
+          <> "/\" <> int.to_string(item.id))], [text("
+          <> value
+          <> ")])"
+        _ -> "text(" <> value <> ")"
+      }
+      "        html.td([], [" <> content <> "]),"
+    })
+    |> string.join("\n")
+
+  // The public list is a label plus the numbers and flags of each row: the
+  // long text fields stay out of a listing.
+  let public_meta =
+    fields
+    |> list.filter(fn(f) {
+      let #(fname, ftype) = f
+      fname != display_field
+      && !is_reference(fname, references)
+      && { ftype == "int" || ftype == "float" || ftype == "bool" }
+    })
+    |> list.map(fn(f) {
+      let #(fname, ftype) = f
+      "            html.span([], [text(\""
+      <> field_label(fname)
+      <> ": \"), text("
+      <> field_to_text(ftype, "item." <> fname)
+      <> ")]),"
+    })
+    |> string.join("\n")
+
+  let public_meta_block = case public_meta {
+    "" -> ""
+    _ -> "
+            html.div([class(\"item-meta\")], [
+" <> public_meta <> "
+            ]),"
+  }
+
+  let display_text = case list.find(fields, fn(f) { f.0 == display_field }) {
+    Ok(#(_, ftype)) -> field_to_text(ftype, "item." <> display_field)
+    Error(_) -> "int.to_string(item.id)"
+  }
+
+  let public_view = case options.public {
+    False -> ""
+    True -> "
+/// Public list: the search box and the page links, no admin links.
+pub fn public_index_view(
+  items: List(" <> type_name <> "),
+  q: String,
+  page: Int,
+  pages: Int,
+) -> Element(Nil) {
+  section([class(\"" <> resource_plural <> "\")], [
+    h1([], [text(\"" <> type_name <> "s\")]),
+    kit.filters(\"/" <> resource_plural <> "\", input([name(\"q\"), value(q)])),
+    case items {
+      [] ->
+        kit.empty_state([#(\"title\", \"No " <> type_name <> "s yet\")], text(\"\"))
+      _ ->
+        html.ul([class(\"" <> resource_singular <> "-list\")], list.map(items, fn(item) {
+          html.li([], [
+            html.p([class(\"item-title\")], [text(" <> display_text <> ")])," <> public_meta_block <> "
+          ])
+        }))
+    },
+    case pages > 1 {
+      True ->
+        kit.pagination(
+          query.url(\"/" <> resource_plural <> "\", [#(\"q\", q)]),
+          page,
+          pages,
+        )
+      False -> text(\"\")
+    },
+  ])
+}
+"
+  }
+
+  "import gleam/int" <> float_import <> bool_import <> "
 import gleam/list
 import gleam/option
 import lustre/attribute.{class, href, name, type_, value}
 import lustre/element.{type Element, text}
-import lustre/element/html.{
-  a, button, div, form, h1, input, label, li, p, section, textarea, ul,
-}
+import lustre/element/html.{" <> html_imports <> "}
 import " <> app_name <> "/domain/" <> resource_singular <> ".{type " <> type_name <> "}
 import " <> app_name <> "/web/forms/" <> resource_singular <> "_form
 import mastro/csrf
+import mastro/kit
+import mastro/query
 
-pub fn index_view(items: List(" <> type_name <> ")) -> Element(Nil) {
+/// Admin index: a search on " <> display_field <> ", a whitelisted sort and
+/// one page of rows.
+pub fn index_view(
+  items: List(" <> type_name <> "),
+  q: String,
+  sort: String,
+  dir: String,
+  page: Int,
+  pages: Int,
+) -> Element(Nil) {
+  let columns = [
+" <> columns <> "
+  ]
+  let rows =
+    list.map(items, fn(item) {
+      html.tr([], [
+" <> row_cells <> "
+      ])
+    })
+
   section([class(\"" <> resource_plural <> "\")], [
     div([class(\"header\")], [
       h1([], [text(\"" <> type_name <> "s\")]),
-      a([href(\"/" <> resource_plural <> "/new\"), class(\"btn\")], [text(\"New " <> type_name <> "\")]),
+      a(
+        [href(\"" <> admin_base <> "/new\"), class(\"btn\")],
+        [text(\"New " <> type_name <> "\")],
+      ),
     ]),
-    ul(
-      [class(\"post-list\")],
-      list.map(items, fn(item) {
-        li([], [
-          a([href(\"/" <> resource_plural <> "/\" <> int.to_string(item.id))], [
-            text(item." <> first_field <> "),
+    kit.filters(\"" <> admin_base <> "\", html.div([class(\"filters-fields\")], [
+      input([type_(\"hidden\"), name(\"sort\"), value(sort)]),
+      input([type_(\"hidden\"), name(\"dir\"), value(dir)]),
+      input([name(\"q\"), value(q)]),
+    ])),
+    case items {
+      [] ->
+        kit.empty_state(
+          [#(\"title\", \"No " <> type_name <> "s yet\")],
+          a([href(\"" <> admin_base <> "/new\")], [text(\"Create the first one\")]),
+        )
+      _ ->
+        kit.table(
+          columns,
+          rows,
+          query.url(\"" <> admin_base <> "\", [#(\"q\", q)]),
+          sort,
+          dir,
+        )
+    },
+    case pages > 1 {
+      True ->
+        kit.pagination(
+          query.url(\"" <> admin_base <> "\", [
+            #(\"q\", q),
+            #(\"sort\", sort),
+            #(\"dir\", dir),
           ]),
-        ])
-      }),
-    ),
+          page,
+          pages,
+        )
+      False -> text(\"\")
+    },
   ])
 }
 
@@ -946,7 +1312,7 @@ pub fn show_view(item: " <> type_name <> ") -> Element(Nil) {
     div([class(\"actions\")], [
       a(
         [
-          href(\"/" <> resource_plural <> "/\" <> int.to_string(item.id) <> \"/edit\"),
+          href(\"" <> admin_base <> "/\" <> int.to_string(item.id) <> \"/edit\"),
           class(\"btn\"),
         ],
         [text(\"Edit\")],
@@ -961,8 +1327,8 @@ pub fn form_view(
   csrf_token: String,
 ) -> Element(Nil) {
   let post_action = case values.id {
-    option.Some(id) -> \"/" <> resource_plural <> "/\" <> int.to_string(id)
-    option.None -> \"/" <> resource_plural <> "\"
+    option.Some(id) -> \"" <> admin_base <> "/\" <> int.to_string(id)
+    option.None -> \"" <> admin_base <> "\"
   }
 
   section([class(\"" <> resource_singular <> "-form\")], [
@@ -991,7 +1357,7 @@ fn field_error(
     Error(_) -> text(\"\")
   }
 }
-"
+" <> public_view
 }
 
 fn resource_form(
@@ -1198,6 +1564,7 @@ fn resource_repo(
   references: List(String),
   sortable: List(String),
   display: String,
+  seed: Bool,
 ) -> String {
   case db {
     Sqlite | NoDb ->
@@ -1209,6 +1576,7 @@ fn resource_repo(
         references,
         sortable,
         display,
+        seed,
       )
     Postgres ->
       resource_repo_pog(
@@ -1219,7 +1587,157 @@ fn resource_repo(
         references,
         sortable,
         display,
+        seed,
       )
+  }
+}
+
+/// The SQLite spelling of the total the pagination needs.
+fn repo_count_sqlite(table: String, display: String, q: String) -> String {
+  "/// A single integer column, decoded from its row.
+fn int_decoder() -> decode.Decoder(Int) {
+  use value <- decode.field(0, decode.int)
+  decode.success(value)
+}
+
+/// How many rows the search matches: the total the pagination needs.
+pub fn count(db_path: String, search: String) -> Int {
+  case repo.query(
+    db_path,
+    \"SELECT COUNT(*) FROM " <> table <> " WHERE " <> display <> " LIKE ?\",
+    [sqlight.text(query.like_pattern(search))],
+    int_decoder(),
+  ) {
+    Ok([total, ..]) -> total
+    _ -> 0
+  }
+}
+
+"
+}
+
+/// The Postgres spelling of the total the pagination needs.
+fn repo_count_pog(table: String, display: String) -> String {
+  "/// A single integer column, decoded from its row.
+fn int_decoder() -> decode.Decoder(Int) {
+  use value <- decode.field(0, decode.int)
+  decode.success(value)
+}
+
+/// How many rows the search matches: the total the pagination needs.
+pub fn count(db: pog.Connection, search: String) -> Int {
+  let rows =
+    pog.query(\"SELECT COUNT(*) FROM " <> table <> " WHERE " <> display <> " LIKE $1\")
+    |> pog.parameter(pog.text(query.like_pattern(search)))
+    |> pog.returning(int_decoder())
+    |> pog.execute(db)
+    |> result.map(fn(r) { r.rows })
+    |> result.unwrap([])
+
+  case rows {
+    [total, ..] -> total
+    [] -> 0
+  }
+}
+
+"
+}
+
+/// The statements that make sure every referenced parent has a row the
+/// demo child can point at: the parent's own demo seed when it ships one,
+/// otherwise the first row it already has.
+fn parent_seed_statements(
+  app: String,
+  references: List(String),
+  db_arg: String,
+) -> String {
+  references
+  |> list.unique
+  |> list.map(fn(parent) {
+    case parent_has_seed(app, parent) {
+      True ->
+        "      use "
+        <> parent
+        <> "_id <- result.try("
+        <> parent
+        <> "_repo.seed_demo("
+        <> db_arg
+        <> "))\n"
+      False ->
+        "      use "
+        <> parent
+        <> " <- result.try(case "
+        <> parent
+        <> "_repo.list("
+        <> db_arg
+        <> ", \"\", \"\", \"\", 1) {\n"
+        <> "        ["
+        <> parent
+        <> ", ..] -> Ok("
+        <> parent
+        <> ")\n"
+        <> "        [] -> Error(Nil)\n"
+        <> "      })\n"
+    }
+  })
+  |> string.join("")
+}
+
+/// The Params values a demo row carries: a reference field points at the
+/// parent row the seed just prepared, the rest is a fixed sample.
+fn seed_params(
+  app: String,
+  type_name: String,
+  fields: List(#(String, String)),
+  references: List(String),
+) -> String {
+  let params =
+    fields
+    |> list.map(fn(f) {
+      let #(field_name, field_type) = f
+      let value = case is_reference(field_name, references) {
+        True ->
+          case parent_has_seed(app, string.drop_end(field_name, 3)) {
+            True -> field_name
+            False -> string.drop_end(field_name, 3) <> ".id"
+          }
+        False -> seed_value(field_type, field_name)
+      }
+      field_name <> ": " <> value
+    })
+    |> string.join(", ")
+
+  type_name <> "Params(" <> params <> ")"
+}
+
+fn seed_value(field_type: String, field_name: String) -> String {
+  case field_type {
+    "int" -> "1"
+    "float" -> "1.0"
+    "bool" -> "True"
+    "date" -> "\"2026-01-01\""
+    "datetime" -> "\"2026-01-01T00:00:00Z\""
+    _ -> "\"Demo " <> capitalize(field_name) <> "\""
+  }
+}
+
+fn is_reference(field_name: String, references: List(String)) -> Bool {
+  string.ends_with(field_name, "_id")
+  && list.contains(references, string.drop_end(field_name, 3))
+}
+
+/// Whether the parent resource was generated at all.
+fn parent_repo_exists(app: String, parent: String) -> Bool {
+  simplifile.is_file("src/" <> app <> "/data/" <> parent <> "_repo.gleam")
+  |> result.unwrap(False)
+}
+
+/// Whether the parent resource ships a demo seed a child can call. Without
+/// one the child references the first row the parent already has.
+fn parent_has_seed(app: String, parent: String) -> Bool {
+  case simplifile.read("src/" <> app <> "/data/" <> parent <> "_repo.gleam") {
+    Ok(content) -> string.contains(content, "pub fn seed_demo(")
+    Error(_) -> False
   }
 }
 
@@ -1231,6 +1749,7 @@ fn resource_repo_sqlite(
   references: List(String),
   sortable: List(String),
   display: String,
+  seed: Bool,
 ) -> String {
   let table = resource_singular <> "s"
   let field_names = list.map(fields, fn(f) { f.0 }) |> string.join(", ")
@@ -1238,6 +1757,48 @@ fn resource_repo_sqlite(
   let q = "\""
   let sortable_literal = string_list_literal(sortable)
   let options_fns = reference_option_fns(references)
+  let count_fn = repo_count_sqlite(table, display, q)
+  let parent_imports = case seed {
+    True -> reference_imports(app_name, references)
+    False -> ""
+  }
+  let params_import = case seed {
+    True -> ".{type " <> type_name <> "Params, " <> type_name <> "Params}"
+    False -> ".{type " <> type_name <> "Params}"
+  }
+  let seed_fns = case seed {
+    True -> "/// The demo row for development: inserted once, when the table is
+/// empty. Returns its id so a child resource can reference it.
+pub fn seed_demo(db_path: String) -> Result(Int, Nil) {
+  case count(db_path, \"\") {
+    0 -> {
+" <> parent_seed_statements(app_name, references, "db_path") <> "      use item <- result.try(create(db_path, " <> seed_params(
+        app_name,
+        type_name,
+        fields,
+        references,
+      ) <> "))
+      Ok(item.id)
+    }
+    _ -> first_id(db_path)
+  }
+}
+
+fn first_id(db_path: String) -> Result(Int, Nil) {
+  case repo.query(
+    db_path,
+    \"SELECT id FROM " <> table <> " ORDER BY id LIMIT 1\",
+    [],
+    int_decoder(),
+  ) {
+    Ok([id, ..]) -> Ok(id)
+    _ -> Error(Nil)
+  }
+}
+
+"
+    False -> ""
+  }
 
   let decoder_fields =
     fields
@@ -1305,9 +1866,12 @@ fn resource_repo_sqlite(
         <> app_name
         <> "/web/forms/"
         <> resource_singular
-        <> "_form.{type "
-        <> type_name
-        <> "Params}",
+        <> "_form"
+        <> params_import
+        <> case parent_imports {
+        "" -> ""
+        imports -> "\n" <> imports
+      },
       "import " <> app_name <> "/data/repo",
       "import mastro/query",
       "import sqlight",
@@ -1367,6 +1931,8 @@ fn resource_repo_sqlite(
       "  }",
       "}",
       "",
+      count_fn,
+      seed_fns,
       options_fns,
       "",
       "pub fn get(db_path: String, id: Int) -> Result("
@@ -1482,15 +2048,61 @@ fn resource_repo_pog(
   references: List(String),
   sortable: List(String),
   display: String,
+  seed: Bool,
 ) -> String {
   let field_names =
     fields
     |> list.map(fn(f) { f.0 })
     |> string.join(", ")
 
+  let table = resource_singular <> "s"
   let select_fields = "id, " <> field_names
   let sortable_literal = string_list_literal(sortable)
   let options_fns = reference_option_fns_pog(references)
+  let count_fn = repo_count_pog(table, display)
+  let parent_imports = case seed {
+    True -> reference_imports(app_name, references)
+    False -> ""
+  }
+  let params_import = case seed {
+    True -> ".{type " <> type_name <> "Params, " <> type_name <> "Params}"
+    False -> ".{type " <> type_name <> "Params}"
+  }
+  let seed_fns = case seed {
+    True -> "/// The demo row for development: inserted once, when the table is
+/// empty. Returns its id so a child resource can reference it.
+pub fn seed_demo(db: pog.Connection) -> Result(Int, Nil) {
+  case count(db, \"\") {
+    0 -> {
+" <> parent_seed_statements(app_name, references, "db") <> "      use item <- result.try(create(db, " <> seed_params(
+        app_name,
+        type_name,
+        fields,
+        references,
+      ) <> "))
+      Ok(item.id)
+    }
+    _ -> first_id(db)
+  }
+}
+
+fn first_id(db: pog.Connection) -> Result(Int, Nil) {
+  let rows =
+    pog.query(\"SELECT id FROM " <> table <> " ORDER BY id LIMIT 1\")
+    |> pog.returning(int_decoder())
+    |> pog.execute(db)
+    |> result.map(fn(r) { r.rows })
+    |> result.unwrap([])
+
+  case rows {
+    [id, ..] -> Ok(id)
+    [] -> Error(Nil)
+  }
+}
+
+"
+    False -> ""
+  }
 
   let decoder_fields =
     fields
@@ -1544,7 +2156,6 @@ fn resource_repo_pog(
   let update_id_param = "$" <> int.to_string(list.length(fields) + 1)
 
   let q = "\""
-  let table = resource_singular <> "s"
 
   let get_query =
     "  pog.query("
@@ -1621,9 +2232,12 @@ fn resource_repo_pog(
         <> app_name
         <> "/web/forms/"
         <> resource_singular
-        <> "_form.{type "
-        <> type_name
-        <> "Params}",
+        <> "_form"
+        <> params_import
+        <> case parent_imports {
+        "" -> ""
+        imports -> "\n" <> imports
+      },
       "import mastro/query",
       "import pog",
       "",
@@ -1677,6 +2291,8 @@ fn resource_repo_pog(
       "  |> result.unwrap([])",
       "}",
       "",
+      count_fn,
+      seed_fns,
       options_fns,
       "",
       "pub fn get(db: pog.Connection, id: Int) -> Result("
@@ -1728,6 +2344,14 @@ fn string_list_literal(items: List(String)) -> String {
   "["
   <> string.join(list.map(items, fn(item) { "\"" <> item <> "\"" }), ", ")
   <> "]"
+}
+
+/// One import per referenced parent: the demo seed calls the parent repo.
+fn reference_imports(app: String, references: List(String)) -> String {
+  references
+  |> list.unique
+  |> list.map(fn(parent) { "import " <> app <> "/data/" <> parent <> "_repo" })
+  |> string.join("\n")
 }
 
 /// One `<parent>_options` function per foreign key, plus the shared decoder.
@@ -1964,7 +2588,12 @@ fn patch_router_page(app: String, name: String) {
   let assert Ok(_) = simplifile.write(router_path, content)
 }
 
-fn patch_router_resource(app: String, plural: String, singular: String) {
+fn patch_router_resource(
+  app: String,
+  plural: String,
+  singular: String,
+  options: ResourceOptions,
+) {
   let router_path = "src/" <> app <> "/router.gleam"
   let assert Ok(content) = simplifile.read(router_path)
 
@@ -1972,39 +2601,52 @@ fn patch_router_resource(app: String, plural: String, singular: String) {
   let import_line = "import " <> app <> "/web/" <> singular <> "_handler"
   let content = add_import(content, import_line)
 
+  // The admin routes are gated in the handler; `--public` adds the list
+  // anyone can read.
+  let public_route = case options.public {
+    True ->
+      "\n    [\""
+      <> plural
+      <> "\"], http.Get -> "
+      <> singular
+      <> "_handler.public_index(req, ctx)"
+    False -> ""
+  }
+
   // Add routes before catch-all
   let routes =
-    "\n    [\""
+    public_route
+    <> "\n    [\"admin\", \""
     <> plural
     <> "\"], http.Get -> "
     <> singular
     <> "_handler.index(req, ctx)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\", \"new\"], http.Get -> "
     <> singular
     <> "_handler.new(req, ctx)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\"], http.Post -> "
     <> singular
     <> "_handler.create(req, ctx)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\", id], http.Get -> "
     <> singular
     <> "_handler.show(req, ctx, id)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\", id, \"edit\"], http.Get -> "
     <> singular
     <> "_handler.edit(req, ctx, id)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\", id], http.Put -> "
     <> singular
     <> "_handler.update(req, ctx, id)
-    [\""
+    [\"admin\", \""
     <> plural
     <> "\", id], http.Delete -> "
     <> singular
@@ -2622,6 +3264,31 @@ fn capitalize(s: String) -> String {
   case string.pop_grapheme(s) {
     Ok(#(first, rest)) -> string.uppercase(first) <> rest
     Error(_) -> s
+  }
+}
+
+/// A column label: `author_id` is the Author.
+fn field_label(field_name: String) -> String {
+  case string.ends_with(field_name, "_id") {
+    True -> capitalize(string.drop_end(field_name, 3))
+    False -> capitalize(field_name)
+  }
+}
+
+/// Gleam source that renders a field as text in the index.
+fn field_to_text(field_type: String, value: String) -> String {
+  case field_type {
+    "int" -> "int.to_string(" <> value <> ")"
+    "float" -> "float.to_string(" <> value <> ")"
+    "bool" -> "bool.to_string(" <> value <> ")"
+    _ -> value
+  }
+}
+
+fn bool_literal(value: Bool) -> String {
+  case value {
+    True -> "True"
+    False -> "False"
   }
 }
 

@@ -123,6 +123,55 @@ pub fn describe_lists_every_missing_value_test() {
   )
 }
 
+// -- Bearer admin gate --------------------------------------------------------
+
+fn with_authorization(value: String) {
+  request.new() |> request.set_header("authorization", value)
+}
+
+pub fn bearer_token_reads_the_header_test() {
+  security.bearer_token(with_authorization("Bearer shhh"))
+  |> should.equal(Ok("shhh"))
+}
+
+pub fn bearer_token_ignores_other_schemes_test() {
+  security.bearer_token(with_authorization("Basic shhh"))
+  |> should.equal(Error(Nil))
+  security.bearer_token(with_authorization("Bearer"))
+  |> should.equal(Error(Nil))
+  security.bearer_token(with_authorization("Bearer "))
+  |> should.equal(Error(Nil))
+  security.bearer_token(request.new()) |> should.equal(Error(Nil))
+}
+
+pub fn bearer_authorized_matches_the_configured_token_test() {
+  security.bearer_authorized(
+    with_authorization("Bearer shhh"),
+    option.Some("shhh"),
+    True,
+  )
+  |> should.be_true
+
+  security.bearer_authorized(
+    with_authorization("Bearer nope"),
+    option.Some("shhh"),
+    True,
+  )
+  |> should.be_false
+
+  security.bearer_authorized(request.new(), option.Some("shhh"), True)
+  |> should.be_false
+}
+
+pub fn bearer_authorized_opens_an_unconfigured_development_gate_test() {
+  security.bearer_authorized(request.new(), option.None, False)
+  |> should.be_true
+  security.bearer_authorized(request.new(), option.None, True)
+  |> should.be_false
+  security.bearer_authorized(request.new(), option.Some(""), False)
+  |> should.be_true
+}
+
 // -- Client address -----------------------------------------------------------
 
 pub fn untrusted_peer_is_the_client_test() {

@@ -10,6 +10,7 @@
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
+import gleam/string
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/html
@@ -168,7 +169,9 @@ fn stat(attrs: List(#(String, String)), _inner: Element(Nil)) -> Element(Nil) {
   ])
 }
 
-fn empty_state(
+/// The empty state a listing shows when it has no rows: a title and a
+/// slot for the hint or the call to action.
+pub fn empty_state(
   attrs: List(#(String, String)),
   inner: Element(Nil),
 ) -> Element(Nil) {
@@ -255,9 +258,10 @@ fn th_for(base: String, sort: String, dir: String) -> fn(Column) -> Element(Nil)
         html.th([attribute.aria_sort(aria)], [
           html.a(
             [
-              attribute.href(
-                base <> "?sort=" <> column.field <> "&dir=" <> next_dir,
-              ),
+              attribute.href(with_query(
+                base,
+                "sort=" <> column.field <> "&dir=" <> next_dir,
+              )),
             ],
             [element.text(column.label)],
           ),
@@ -280,9 +284,10 @@ pub fn pagination(base: String, page: Int, total_pages: Int) -> Element(Nil) {
             ],
           )
         False ->
-          html.a([attribute.href(base <> "?page=" <> int.to_string(n))], [
-            element.text(int.to_string(n)),
-          ])
+          html.a(
+            [attribute.href(with_query(base, "page=" <> int.to_string(n)))],
+            [element.text(int.to_string(n))],
+          )
       }
     })
   html.nav(
@@ -322,6 +327,15 @@ pub fn link_to(
 }
 
 // -- Helpers ------------------------------------------------------------------
+
+/// Append a query fragment to a link base, keeping a base that already
+/// carries a query string (`/posts?q=term`) valid.
+fn with_query(base: String, query: String) -> String {
+  case string.contains(base, "?") {
+    True -> base <> "&" <> query
+    False -> base <> "?" <> query
+  }
+}
 
 fn with_error(control: Element(Nil), error: String) -> Element(Nil) {
   case error {

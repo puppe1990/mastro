@@ -38,6 +38,25 @@ fn decode(value: String) -> String {
   uri.percent_decode(value) |> result.unwrap(value)
 }
 
+/// A link base for sort and pagination links: the path plus the params that
+/// must survive them (`q`, `sort`, `dir`). Empty values drop out and the
+/// values are percent-encoded, so the base is a valid URL on its own and
+/// `mastro/kit` can append `&sort=` / `&page=` to it.
+pub fn url(path: String, params: List(#(String, String))) -> String {
+  let query =
+    params
+    |> list.filter(fn(pair) { pair.1 != "" })
+    |> list.map(fn(pair) {
+      uri.percent_encode(pair.0) <> "=" <> uri.percent_encode(pair.1)
+    })
+    |> string.join("&")
+
+  case query {
+    "" -> path
+    _ -> path <> "?" <> query
+  }
+}
+
 /// `ORDER BY <column> <direction>`, or `ORDER BY <default> asc` when the
 /// caller's column is not in `allowed` or the direction is not asc/desc.
 pub fn order_by(
